@@ -3,8 +3,8 @@
 Run against the bundled app (`packaging/macos/bundle.sh`, then open `target/bundle/Downlink.app`).
 Record pass/fail and the date for each item.
 
-Last run: 2026-10-13, bundle built from `feat/v1` at a14fa7a. All ticked items passed (launch at login after a reboot, on the 27b34dc
-bundle); the offline check is still to do.
+Last run: 2026-10-13, bundle built from `feat/v1` (a14fa7a; launch at login and offline re-checked
+on the 27b34dc bundle). All items passed.
 
 - [x] Cold start with the keyboard plugged in: connected within 2 s, no Dock icon.
 - [x] Plug the keyboard in after start: connects within 2 s.
@@ -19,5 +19,5 @@ bundle); the offline check is still to do.
 - [x] ⌘W and ⌘Q in the Layout and Settings windows close the window only; the icon stays and switching continues.
 - [x] Minimize the layout window (⌘M), then choose Show Layout from the menu bar: the window comes back and takes focus.
 - [x] A second launch exits immediately ("already running" in the log).
-- [ ] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.
+- [x] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.
 - [x] Logs in `~/Library/Logs/Downlink/` have no ERROR lines during the above.
