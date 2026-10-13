@@ -1,0 +1,30 @@
+[package]
+name = "downlink"
+description = "Menu-bar companion for the ZSA Voyager: live layout view and per-layer input-source switching"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+companion-core.workspace = true
+input-source.workspace = true
+oryx-protocol.workspace = true
+oryx-device = { workspace = true, features = ["hid"] }
+oryx-layout = { workspace = true, features = ["client"] }
+iced = { version = "0.14", features = ["canvas", "tokio"] }
+tray-icon = "0.26"
+futures = "0.3"
+dirs = "7"
+png = "0.18"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder", "NSRunningApplication"] }
+
+[dev-dependencies]
+tempfile.workspace = true
