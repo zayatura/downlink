@@ -1,6 +1,7 @@
 [package]
 name = "downlink"
 description = "Menu-bar companion for the ZSA Voyager: live layout view and per-layer input-source switching"
+default-run = "downlink"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
