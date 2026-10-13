@@ -11,7 +11,7 @@ pub mod source_choice;
 pub mod theme;
 
 mod device;
-mod layout_view;
+pub mod layout_view;
 mod settings_view;
 pub mod tray;
 
