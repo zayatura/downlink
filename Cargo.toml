@@ -1,0 +1,22 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
+repository = "https://github.com/zayatura/downlink"
+
+[workspace.dependencies]
+oryx-protocol = { path = "crates/oryx-protocol" }
+oryx-device = { path = "crates/oryx-device", default-features = false }
+oryx-layout = { path = "crates/oryx-layout", default-features = false }
+input-source = { path = "crates/input-source" }
+companion-core = { path = "crates/companion-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tempfile = "3"
