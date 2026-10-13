@@ -5,3 +5,4 @@ pub mod logging;
 pub mod paths;
 pub mod platform;
 pub mod single_instance;
+pub mod theme;
