@@ -1,9 +1,10 @@
 //! The pure state machine at the heart of Downlink: inputs in, effects out.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use oryx_device::DeviceEvent;
-use oryx_layout::Layout;
+use oryx_layout::{Layout, geometry};
 use oryx_protocol::{LayoutIds, Model};
 
 use crate::config::Config;
@@ -44,6 +45,8 @@ pub enum Input {
     SelectFailed(String),
     ConfigChanged(Config),
     SetPaused(bool),
+    /// `Some(layer)` pins a preview; `None` (or the live layer) follows live again.
+    PreviewLayer(Option<u8>),
     RefreshLayout,
     Quit,
 }
@@ -71,6 +74,9 @@ pub struct Engine {
     paused: bool,
     layout: LayoutState,
     current_source: Option<String>,
+    /// Oryx indices of keys currently held down.
+    pressed: BTreeSet<usize>,
+    preview: Option<u8>,
 }
 
 impl Engine {
@@ -83,6 +89,8 @@ impl Engine {
             paused: false,
             layout: LayoutState::None,
             current_source: None,
+            pressed: BTreeSet::new(),
+            preview: None,
         }
     }
 
@@ -108,6 +116,29 @@ impl Engine {
 
     pub fn current_source(&self) -> Option<&str> {
         self.current_source.as_deref()
+    }
+
+    pub fn pressed(&self) -> &BTreeSet<usize> {
+        &self.pressed
+    }
+
+    /// The layer the layout window shows: the pinned preview, else the live layer.
+    pub fn shown_layer(&self) -> Option<u8> {
+        self.preview.or(self.layer)
+    }
+
+    pub fn is_following(&self) -> bool {
+        self.preview.is_none()
+    }
+
+    pub fn layer_title(&self, index: u8) -> String {
+        if let LayoutState::Ready(layout) = &self.layout
+            && let Some(layer) = layout.layers.iter().find(|layer| layer.index == index)
+            && !layer.title.trim().is_empty()
+        {
+            return layer.title.trim().to_owned();
+        }
+        format!("Layer {index}")
     }
 
     pub fn handle(&mut self, input: Input) -> Vec<Effect> {
@@ -139,6 +170,13 @@ impl Engine {
             Input::SetPaused(paused) => {
                 self.paused = paused;
                 vec![Effect::RefreshTray]
+            }
+            Input::PreviewLayer(layer) => {
+                self.preview = match layer {
+                    Some(layer) if Some(layer) == self.layer => None,
+                    other => other,
+                };
+                Vec::new()
             }
             Input::RefreshLayout => match &self.connection {
                 Connection::Connected {
@@ -180,8 +218,18 @@ impl Engine {
                 effects.push(Effect::RefreshTray);
                 effects
             }
-            // Pressed-key tracking is added in Task 17.
-            DeviceEvent::KeyDown(_) | DeviceEvent::KeyUp(_) => Vec::new(),
+            DeviceEvent::KeyDown(pos) => {
+                if let Some(index) = self.key_index(pos) {
+                    self.pressed.insert(index);
+                }
+                Vec::new()
+            }
+            DeviceEvent::KeyUp(pos) => {
+                if let Some(index) = self.key_index(pos) {
+                    self.pressed.remove(&index);
+                }
+                Vec::new()
+            }
             DeviceEvent::Disconnected { reason } => {
                 tracing::info!(%reason, "keyboard disconnected");
                 self.lose_connection(Connection::Searching)
@@ -192,6 +240,13 @@ impl Engine {
             DeviceEvent::OpenFailed { reason } => {
                 self.lose_connection(Connection::OpenFailed { reason })
             }
+        }
+    }
+
+    fn key_index(&self, pos: oryx_protocol::MatrixPos) -> Option<usize> {
+        match &self.connection {
+            Connection::Connected { model, .. } => geometry::oryx_index(*model, pos),
+            _ => None,
         }
     }
 
@@ -207,6 +262,7 @@ impl Engine {
             protocol,
         };
         self.layer = None;
+        self.pressed.clear();
         let mut effects = vec![Effect::RefreshTray];
         match ids {
             Some(ids) => {
@@ -238,6 +294,7 @@ impl Engine {
         let changed = self.connection != next;
         self.connection = next;
         self.layer = None;
+        self.pressed.clear();
         let mut effects = if changed {
             vec![Effect::RefreshTray]
         } else {
