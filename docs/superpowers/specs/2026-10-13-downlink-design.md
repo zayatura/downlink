@@ -77,7 +77,9 @@ Downlink opens only the `0xFF60/0x61` interface.
 
 ### 4.3 The Oryx raw-HID protocol (source: `zsa/qmk_modules`, `oryx/oryx.{h,c}`, protocol v5)
 
-Packets are 32 bytes: `[code, params…, 0xFE (stop byte, ORYX_STOP_BIT = -2), padding]`.
+Packets are 32 bytes: `[code, params…, 0xFE (stop byte, ORYX_STOP_BIT = -2), padding]`. The padding isn't
+zeroed: real packets carry uninitialised buffer bytes after the stop byte (Phase 0), so decoders must
+ignore everything past it.
 
 Host → keyboard commands:
 
@@ -160,16 +162,20 @@ Key facts from the firmware source:
 - `KEYDOWN`/`KEYUP` events report `(col, row)`. Downlink maps them to a QMK matrix position, then
   to the `LAYOUT` index, then to the Oryx index.
 
-### 4.6 Not yet verified (resolved by the Phase 0 spike, section 9)
+### 4.6 Questions resolved by the Phase 0 spike (details: `docs/superpowers/spikes/phase0-findings.md`)
 
-1. Whether layer, key and firmware-version events arrive exactly as described when read through
-   `hidapi`.
-2. Whether macOS asks for Input Monitoring permission to open the `0xFF60` interface.
-3. Whether Downlink and Keymapp can both hold that interface at the same time.
-4. Whether `TISSelectInputSource` switches custom Ukelele layouts reliably. `macism` exists
-   because input methods (as opposed to plain keyboard layouts) sometimes don't switch.
-5. Whether `tray-icon` can be created and driven inside an iced 0.14 `daemon` on macOS. It must
-   be created on the main thread after the event loop starts.
+1. ~~Events via hidapi~~ **Yes, as described.** The replies arrive in send order, key events report
+   `(col, row)`, and the real captures confirm the matrix → Oryx mapping.
+2. ~~Input Monitoring~~ **Not required** for the `0xFF60` vendor interface: no prompt appeared and
+   no entry was added.
+3. ~~Sharing with Keymapp~~ **Impossible while Keymapp is connected.** Keymapp opens the interface
+   exclusively (IOKit `0xE00002C5`). Downlink replaces Keymapp, and the open error says so.
+4. ~~TIS reliability~~ **Reliable:** 30/30 switches between the custom Voyager layouts. No `macism`
+   workaround is needed.
+5. ~~tray-icon in an iced daemon~~ **Works.** Two caveats: tray-icon 0.26 renamed its
+   template-icon calls (`with_icon_templated`, `set_icon_templated`), and ⌘Q in a window goes
+   through winit's default app menu (`NSApp terminate:`), which ends the process outside
+   Downlink's Quit path. Downlink therefore installs its own app menu (§8).
 6. ~~How Oryx encodes a transparent key compared with a no-op key.~~ **Resolved during
    planning:** see section 4.4.
 
@@ -378,8 +384,10 @@ Rules 1–3 and 5 match the Python service's behavior. Rule 6 (pause) is new.
 
 ### 6.5 Theme
 
-- `Appearance = System` follows `iced::system::theme()` at startup and
-  `system::theme_changes()` afterwards.
+- `Appearance = System` follows `system::theme_changes()`. iced reports `Mode::None` until a
+  window exists (Phase 0), so on macOS Downlink seeds the mode itself, from `defaults read -g
+  AppleInterfaceStyle`, at startup and whenever it opens a window. `None` reports from iced
+  never overwrite a known mode.
 - `Light` and `Dark` force a palette.
 - Two custom iced `Theme`s (light and dark), with the colours from the mockups
   (dark: bg `#1d1f24`, key `#30343c`, accent `#4cc2ff`, press `#ffb547`; light: bg `#f4f5f7`,
@@ -425,7 +433,8 @@ macOS.)
 |-----------|----------|
 | Keyboard unplugged, or the host sleeps | A read error leads to `Disconnected`, then rule 6.4.2 (fallback), then enumerating every 1 s again. The menu says "Waiting for Voyager…". |
 | Host wakes but the keyboard stayed attached | The firmware may have dropped pairing during sleep. The 5 s heartbeat sends `PAIRING_INIT` again, and events resume. |
-| iced exits without going through Quit (for example ⌘Q in a window) | After the event loop returns, `main` checks whether the Quit path already ran. If not, it reloads the config and selects the fallback source. |
+| ⌘Q in a Downlink window | winit's default app menu would call `NSApp terminate:` and end the process outside Downlink's Quit path (Phase 0). Downlink replaces that menu with its own muda app menu, whose ⌘Q item goes through Downlink's own handling. (The behaviour itself is an open decision recorded in the Phase 0 findings.) |
+| The event loop returns without going through Quit | `main` checks whether the Quit path already ran. If not, it reloads the config and selects the fallback source. This is a backstop only. |
 | The HID interface won't open (permission denied, busy) | The menu shows "Can't open keyboard: {reason}". Retry with backoff (1 s, doubling up to 10 s). |
 | No `PAIRING_SUCCESS` or `LAYER` within 2 s | Treated as non-Oryx firmware: `Unsupported`, the menu says so, and switching is inactive. Check again on the next reconnect. |
 | Protocol version below 4 or above 5 | Log a warning and carry on; only the core events are used. |
@@ -435,7 +444,7 @@ macOS.)
 | `TISSelectInputSource` fails | Log it, don't retry in a loop. The next layer change tries again. |
 | Downlink launched again | The second copy finds the lock, logs "already running", and exits. |
 | Config file is corrupt | Rename it to `config.toml.bad-{timestamp}`, start with defaults, log an error. |
-| Keymapp running at the same time | Allowed if the spike shows the HID interface can be shared. Otherwise the README says to quit Keymapp, and the "busy" error mentions it. |
+| Keymapp running at the same time | Not possible: Keymapp opens the raw-HID interface exclusively (Phase 0). The open error is shown as "The keyboard is in use by another app (quit Keymapp)", it is retried with backoff, and the README says to quit Keymapp. |
 
 ## 9. Delivery phases
 
@@ -525,8 +534,8 @@ Downlink is **MIT-licensed** (`LICENSE`, copyright holder "zayatura"). Every cra
 
 | Risk | Mitigation |
 |------|------------|
-| tray-icon and iced don't integrate on macOS | Phase 0 probe. The fallback GUI is Tauri 2, keeping all the non-GUI crates. |
-| Input Monitoring permission needed for HID | Phase 0 probe. If needed, show a first-run explanation and a status-menu hint. |
+| tray-icon and iced don't integrate on macOS | Resolved in Phase 0: they integrate (see §4.6, item 5 for the caveats). |
+| Input Monitoring permission needed for HID | Resolved in Phase 0: not needed for the `0xFF60` interface. |
 | Oryx GraphQL schema changes, or the API stops working without a login | Cache every fetched revision. The UI degrades to key outlines, and switching keeps working. |
-| `TISSelectInputSource` unreliable for some sources | Phase 0 probe with the real custom layouts. If needed, use the workaround `macism` uses. |
+| `TISSelectInputSource` unreliable for some sources | Resolved in Phase 0 for keyboard layouts (30/30). Input methods such as CJK IMEs are untested; if needed, use the workaround `macism` uses. |
 | The firmware protocol changes (v6+) | Only core events are used. Unknown codes are logged and ignored. |
