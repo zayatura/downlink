@@ -1,5 +1,7 @@
 //! The menu-bar item (spec §6.1).
 
+use std::sync::{Mutex, OnceLock, PoisonError};
+
 use companion_core::TrayView;
 use futures::channel::mpsc;
 use futures::{SinkExt, Stream, StreamExt};
@@ -7,7 +9,7 @@ use tray_icon::menu::accelerator::Accelerator;
 use tray_icon::menu::{
     CheckMenuItem, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu,
 };
-use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+use tray_icon::{Icon, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use crate::icon;
 
@@ -160,13 +162,51 @@ fn tray_icon_image(connected: bool) -> Result<Icon, String> {
         .map_err(|e| e.to_string())
 }
 
+/// The process-wide channel that carries clicked menu item IDs from muda's handler to the
+/// `menu_events` stream: the sender, and the receiver until the stream takes it.
+type MenuChannel = (
+    mpsc::UnboundedSender<String>,
+    Mutex<Option<mpsc::UnboundedReceiver<String>>>,
+);
+
+static MENU_CHANNEL: OnceLock<MenuChannel> = OnceLock::new();
+
+fn menu_channel() -> &'static MenuChannel {
+    MENU_CHANNEL.get_or_init(|| {
+        let (tx, rx) = mpsc::unbounded();
+        (tx, Mutex::new(Some(rx)))
+    })
+}
+
+/// Register both event handlers. Call it once, first thing in `App::init`, before any menu or
+/// tray icon exists.
+///
+/// tray-icon and muda keep their handler in a write-once cell. An event that arrives while no
+/// handler is set fills the cell with "no handler" for good, so a handler registered later from
+/// inside a subscription future could be silently ignored. With no handler, tray-icon also
+/// queues every Enter/Move/Leave/Click over the status item in a global unbounded channel that
+/// nothing reads, so the memory only grows.
+pub fn install_event_handlers() {
+    // Downlink doesn't use tray events; the handler only stops them piling up.
+    TrayIconEvent::set_event_handler(Some(|_event: TrayIconEvent| {}));
+    let tx = menu_channel().0.clone();
+    MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
+        let _ = tx.unbounded_send(event.id.0);
+    }));
+}
+
 /// Menu item IDs as they are clicked.
 pub fn menu_events() -> impl Stream<Item = String> {
     iced::stream::channel(16, async |mut output: mpsc::Sender<String>| {
-        let (tx, mut rx) = mpsc::unbounded::<String>();
-        MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let _ = tx.unbounded_send(event.id.0);
-        }));
+        let receiver = menu_channel()
+            .1
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        let Some(mut rx) = receiver else {
+            tracing::error!("the menu event stream was started twice; menu clicks are not handled");
+            return;
+        };
         while let Some(id) = rx.next().await {
             if output.send(id).await.is_err() {
                 break;

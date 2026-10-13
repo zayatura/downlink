@@ -245,6 +245,7 @@ impl App {
     }
 
     fn init(&mut self) -> Task<Message> {
+        tray::install_event_handlers();
         platform::hide_dock_icon();
         self.seed_system_mode();
         match AppMenu::install() {
