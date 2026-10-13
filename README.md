@@ -26,7 +26,7 @@ cp -R target/bundle/Downlink.app /Applications/
 open /Applications/Downlink.app
 ```
 
-The antenna icon appears in the menu bar. Open **Settings…** to choose an input source for each
+The Downlink key icon appears in the menu bar. Open **Settings…** to choose an input source for each
 layer and the fallback used when the keyboard disconnects or Downlink quits. Turn on **Launch at
 login** there, too.
 
