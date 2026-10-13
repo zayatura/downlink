@@ -60,6 +60,9 @@ pub fn load(path: &Path) -> Loaded {
                 warnings: Vec::new(),
             };
         }
+        Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+            return move_aside(path, "is not valid UTF-8 text");
+        }
         Err(error) => {
             return Loaded {
                 config: Config::default(),
@@ -72,20 +75,23 @@ pub fn load(path: &Path) -> Loaded {
     };
     match parse(&text) {
         Ok((config, warnings)) => Loaded { config, warnings },
-        Err(error) => {
-            let backup = backup_path(path, SystemTime::now());
-            let note = match fs::rename(path, &backup) {
-                Ok(()) => format!("kept the unreadable file as {}", backup.display()),
-                Err(rename_error) => format!("could not move it aside: {rename_error}"),
-            };
-            Loaded {
-                config: Config::default(),
-                warnings: vec![format!(
-                    "{} is not valid TOML ({error}); using defaults and {note}",
-                    path.display()
-                )],
-            }
-        }
+        Err(error) => move_aside(path, &format!("is not valid TOML ({error})")),
+    }
+}
+
+/// Moves an unreadable file to `config.toml.bad-<secs>` and returns defaults with one warning.
+fn move_aside(path: &Path, problem: &str) -> Loaded {
+    let backup = backup_path(path, SystemTime::now());
+    let note = match fs::rename(path, &backup) {
+        Ok(()) => format!("kept the unreadable file as {}", backup.display()),
+        Err(rename_error) => format!("could not move it aside: {rename_error}"),
+    };
+    Loaded {
+        config: Config::default(),
+        warnings: vec![format!(
+            "{} {problem}; using defaults and {note}",
+            path.display()
+        )],
     }
 }
 

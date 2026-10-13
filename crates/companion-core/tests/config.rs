@@ -146,6 +146,28 @@ fn a_corrupt_file_is_moved_aside_and_defaults_are_used() {
 }
 
 #[test]
+fn a_non_utf8_file_is_moved_aside_with_its_bytes_intact() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.toml");
+    let original: &[u8] = &[0xff, 0xfe, b'a'];
+    fs::write(&path, original).unwrap();
+    let loaded = config::load(&path);
+    assert_eq!(loaded.config, Config::default());
+    assert_eq!(loaded.warnings.len(), 1, "{:?}", loaded.warnings);
+    assert!(!path.exists(), "the non-UTF-8 file was moved");
+    let backups: Vec<std::path::PathBuf> = fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with("config.toml.bad-"))
+        })
+        .collect();
+    assert_eq!(backups.len(), 1);
+    assert_eq!(fs::read(&backups[0]).unwrap(), original);
+}
+
+#[test]
 fn backup_names_use_unix_seconds() {
     let backup = config::backup_path(
         Path::new("/x/config.toml"),
