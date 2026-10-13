@@ -1,0 +1,24 @@
+[package]
+name = "oryx-layout"
+description = "Oryx layout model, Voyager geometry, key legends, layout cache and GraphQL client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["client"]
+client = ["dep:reqwest"]
+
+[dependencies]
+oryx-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+reqwest = { version = "0.13", features = ["json"], optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
