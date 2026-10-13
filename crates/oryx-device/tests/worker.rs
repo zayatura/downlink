@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use oryx_device::{DeviceCommand, DeviceEvent, Discovery, Found, Timing, Transport, run};
 use oryx_protocol::{Command, LayoutIds, Model, PACKET_LEN};
@@ -247,5 +247,58 @@ fn host_commands_are_written_to_the_keyboard() {
     assert!(
         written.iter().any(|p| p[..4] == [0x04, 1, 3, 0xFE]),
         "SetLayer was written"
+    );
+}
+
+#[test]
+fn a_lost_keyboard_is_not_reopened_before_the_poll_interval() {
+    let poll_interval = Duration::from_millis(30);
+    let (discovery, _) = FakeDiscovery::new(vec![
+        Step::Found(vec![Read::Fail("x")]),
+        Step::Found(vec![Read::Fail("x")]),
+    ]);
+    let (_tx, rx) = mpsc::channel();
+    let mut disconnected_at = Vec::new();
+    run(
+        discovery,
+        Timing {
+            poll_interval,
+            ..fast()
+        },
+        rx,
+        |event| {
+            if matches!(event, DeviceEvent::Disconnected { .. }) {
+                disconnected_at.push(Instant::now());
+            }
+            disconnected_at.len() < 2
+        },
+    );
+    assert_eq!(disconnected_at.len(), 2);
+    assert!(
+        disconnected_at[1].duration_since(disconnected_at[0]) >= poll_interval,
+        "the loop paused between the two reconnect attempts"
+    );
+}
+
+#[test]
+fn shutdown_interrupts_the_open_failure_backoff() {
+    let (discovery, _) = FakeDiscovery::new(vec![Step::OpenFails("busy")]);
+    let (tx, rx) = mpsc::channel();
+    let timing = Timing {
+        backoff_start: Duration::from_millis(500),
+        backoff_max: Duration::from_secs(10),
+        ..fast()
+    };
+    let started = Instant::now();
+    run(discovery, timing, rx, |event| {
+        if matches!(event, DeviceEvent::OpenFailed { .. }) {
+            tx.send(DeviceCommand::Shutdown).unwrap();
+        }
+        true
+    });
+    assert!(
+        started.elapsed() < Duration::from_millis(200),
+        "shutdown took {:?}, so the backoff sleep was not interruptible",
+        started.elapsed()
     );
 }

@@ -1,5 +1,4 @@
-use std::sync::mpsc::{Receiver, TryRecvError};
-use std::thread::sleep;
+use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
 use std::time::{Duration, Instant};
 
 use oryx_protocol::{Command, PACKET_LEN};
@@ -54,12 +53,16 @@ pub fn run<D: Discovery>(
         let found = match discovery.find() {
             Ok(Some(found)) => found,
             Ok(None) => {
-                sleep(timing.poll_interval);
+                if pause(&commands, timing.poll_interval) {
+                    return;
+                }
                 continue;
             }
             Err(error) => {
                 tracing::warn!(%error, "keyboard enumeration failed");
-                sleep(timing.poll_interval);
+                if pause(&commands, timing.poll_interval) {
+                    return;
+                }
                 continue;
             }
         };
@@ -73,7 +76,9 @@ pub fn run<D: Discovery>(
                 if !emit(DeviceEvent::OpenFailed { reason }) {
                     return;
                 }
-                sleep(backoff);
+                if pause(&commands, backoff) {
+                    return;
+                }
                 backoff = (backoff * 2).min(timing.backoff_max);
                 continue;
             }
@@ -82,6 +87,11 @@ pub fn run<D: Discovery>(
             Exit::Shutdown | Exit::ReceiverGone => return,
             Exit::Lost(reason) => {
                 if !emit(DeviceEvent::Disconnected { reason }) {
+                    return;
+                }
+                // The interface can keep enumerating while it fails, so pace the
+                // next attempt to the enumeration interval (spec §8).
+                if pause(&commands, timing.poll_interval) {
                     return;
                 }
             }
@@ -97,6 +107,23 @@ fn shutdown_requested(commands: &Receiver<DeviceCommand>) -> bool {
                 tracing::debug!(?command, "dropping command: no keyboard connected");
             }
             Err(TryRecvError::Empty) => return false,
+        }
+    }
+}
+
+/// Waits up to `duration` while still watching `commands`, so a shutdown is not
+/// held up by a sleep. Returns `true` when the loop must stop: on `Shutdown`, or
+/// when the sender has been dropped. Host commands are dropped, since no
+/// keyboard is connected while pausing.
+fn pause(commands: &Receiver<DeviceCommand>, duration: Duration) -> bool {
+    let deadline = Instant::now() + duration;
+    loop {
+        match commands.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok(DeviceCommand::Shutdown) | Err(RecvTimeoutError::Disconnected) => return true,
+            Ok(DeviceCommand::Send(command)) => {
+                tracing::debug!(?command, "dropping command: no keyboard connected");
+            }
+            Err(RecvTimeoutError::Timeout) => return false,
         }
     }
 }
