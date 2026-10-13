@@ -15,3 +15,7 @@ hid = ["dep:hidapi"]
 oryx-protocol.workspace = true
 tracing.workspace = true
 hidapi = { version = "2.6", features = ["macos-shared-device"], optional = true }
+
+[[example]]
+name = "watch"
+required-features = ["hid"]

@@ -1,9 +1,13 @@
 //! Talks to a ZSA keyboard's Oryx raw-HID interface: handshake, events, reconnect.
 
+#[cfg(feature = "hid")]
+mod hid;
 mod session;
 mod transport;
 mod worker;
 
+#[cfg(feature = "hid")]
+pub use hid::{HidDiscovery, HidTransport, describe_open_error};
 pub use session::{HANDSHAKE_TIMEOUT, HEARTBEAT_IDLE, Session, UNSUPPORTED_REASON};
 pub use transport::{Discovery, Found, Transport};
 pub use worker::{DeviceCommand, Timing, run};
