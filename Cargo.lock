@@ -550,6 +550,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "input-source"
+version = "0.1.0"
+dependencies = [
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "thiserror",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
