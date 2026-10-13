@@ -12,6 +12,11 @@ pub fn hide_dock_icon() {
         return;
     };
     let app = NSApplication::sharedApplication(mtm);
+    // The bundle's LSUIElement already starts Downlink as an accessory app, and macOS answers
+    // a request for the policy it already has with "refused".
+    if app.activationPolicy() == NSApplicationActivationPolicy::Accessory {
+        return;
+    }
     #[allow(unused_unsafe)]
     let changed = unsafe { app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) };
     if !changed {
