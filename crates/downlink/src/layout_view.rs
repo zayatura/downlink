@@ -15,6 +15,19 @@ use oryx_protocol::Model;
 use crate::app::{App, Message};
 use crate::theme::{self, Colors};
 
+/// The text over the keyboard while there is nothing (or not yet anything) to show.
+pub fn overlay_message(layout: &LayoutState, connected: bool, retrying: bool) -> Option<String> {
+    match (layout, connected) {
+        (LayoutState::Loading, _) => Some("Loading layout…".to_owned()),
+        (LayoutState::Unavailable(_), _) if retrying => {
+            Some("Layout unavailable — will retry when online.".to_owned())
+        }
+        (LayoutState::Unavailable(reason), _) => Some(format!("Layout unavailable — {reason}")),
+        (_, false) => Some("Waiting for Voyager…".to_owned()),
+        _ => None,
+    }
+}
+
 /// Gap between neighbouring keys, in key units.
 const KEY_GAP: f32 = 0.08;
 
@@ -94,12 +107,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
         })
         .unwrap_or_default();
 
-    let message = match (engine.layout(), connected) {
-        (LayoutState::Loading, _) => Some("Loading layout…".to_owned()),
-        (LayoutState::Unavailable(reason), _) => Some(format!("Layout unavailable — {reason}")),
-        (_, false) => Some("Waiting for Voyager…".to_owned()),
-        _ => None,
-    };
+    let message = overlay_message(
+        engine.layout(),
+        connected,
+        engine.layout_retry_interval().is_some(),
+    );
     let keyboard = canvas(Keyboard {
         legends,
         pressed: if connected {

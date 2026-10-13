@@ -51,6 +51,7 @@ pub enum Message {
     SetAppearance(Appearance),
     SetLaunchAtLogin(bool),
     RefreshLayout,
+    RetryLayout,
 }
 
 pub struct App {
@@ -136,6 +137,11 @@ impl App {
         } else {
             time::every(Duration::from_secs(2)).map(|_| Message::PollSource)
         };
+        // The first tick comes one interval after the failure, and a new interval restarts it.
+        let retry = match self.engine.layout_retry_interval() {
+            Some(interval) => time::every(interval).map(|_| Message::RetryLayout),
+            None => Subscription::none(),
+        };
         Subscription::batch([
             Subscription::run(device::events).map(Message::Device),
             Subscription::run(tray::menu_events).map(Message::Menu),
@@ -146,6 +152,7 @@ impl App {
                 _ => None,
             }),
             poll,
+            retry,
         ])
     }
 
@@ -241,6 +248,7 @@ impl App {
                 }
             },
             Message::RefreshLayout => self.dispatch(Input::RefreshLayout),
+            Message::RetryLayout => self.dispatch(Input::RetryLayout),
         }
     }
 

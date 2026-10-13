@@ -2,12 +2,18 @@
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use oryx_device::DeviceEvent;
 use oryx_layout::{Layout, geometry};
 use oryx_protocol::{LayoutIds, Model};
 
 use crate::config::Config;
+
+/// How long to wait before retrying the first failed layout fetch (spec §6.2).
+pub const FIRST_LAYOUT_RETRY: Duration = Duration::from_secs(30);
+/// The retry interval doubles after each failure, up to this.
+pub const MAX_LAYOUT_RETRY: Duration = Duration::from_secs(600);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Connection {
@@ -48,6 +54,8 @@ pub enum Input {
     /// `Some(layer)` pins a preview; `None` (or the live layer) follows live again.
     PreviewLayer(Option<u8>),
     RefreshLayout,
+    /// The scheduled layout retry is due.
+    RetryLayout,
     Quit,
 }
 
@@ -77,6 +85,10 @@ pub struct Engine {
     /// Oryx indices of keys currently held down.
     pressed: BTreeSet<usize>,
     preview: Option<u8>,
+    /// The scheduled layout retry, if any: how long after the failure it is due.
+    retry: Option<Duration>,
+    /// The interval the next failed fetch schedules.
+    backoff: Duration,
 }
 
 impl Engine {
@@ -91,6 +103,8 @@ impl Engine {
             current_source: None,
             pressed: BTreeSet::new(),
             preview: None,
+            retry: None,
+            backoff: FIRST_LAYOUT_RETRY,
         }
     }
 
@@ -125,6 +139,11 @@ impl Engine {
     /// The layer the layout window shows: the pinned preview, else the live layer.
     pub fn shown_layer(&self) -> Option<u8> {
         self.preview.or(self.layer)
+    }
+
+    /// When the failed layout fetch should be tried again; `None` when no retry is scheduled.
+    pub fn layout_retry_interval(&self) -> Option<Duration> {
+        self.retry
     }
 
     pub fn is_following(&self) -> bool {
@@ -190,10 +209,14 @@ impl Engine {
                         force: true,
                     }];
                     self.layout = LayoutState::Loading;
+                    // A manual refresh replaces the scheduled retry; the backoff keeps growing
+                    // if it fails too.
+                    self.retry = None;
                     effects
                 }
                 _ => Vec::new(),
             },
+            Input::RetryLayout => self.on_retry_layout(),
             Input::Quit => {
                 let mut effects = self.fallback_effect();
                 effects.push(Effect::Exit);
@@ -263,6 +286,7 @@ impl Engine {
         };
         self.layer = None;
         self.pressed.clear();
+        self.reset_layout_retry();
         let mut effects = vec![Effect::RefreshTray];
         match ids {
             Some(ids) => {
@@ -295,6 +319,7 @@ impl Engine {
         self.connection = next;
         self.layer = None;
         self.pressed.clear();
+        self.reset_layout_retry();
         let mut effects = if changed {
             vec![Effect::RefreshTray]
         } else {
@@ -352,10 +377,49 @@ impl Engine {
         {
             return Vec::new();
         }
-        self.layout = match result {
-            Ok(layout) => LayoutState::Ready(layout),
-            Err(error) => LayoutState::Unavailable(error),
-        };
+        match result {
+            Ok(layout) => {
+                self.layout = LayoutState::Ready(layout);
+                self.reset_layout_retry();
+            }
+            Err(error) => {
+                self.layout = LayoutState::Unavailable(error);
+                // Only a connected keyboard with known ids has anything to retry.
+                if matches!(self.connection, Connection::Connected { ids: Some(_), .. }) {
+                    self.retry = Some(self.backoff);
+                    self.backoff = (self.backoff * 2).min(MAX_LAYOUT_RETRY);
+                }
+            }
+        }
         vec![Effect::RefreshTray]
+    }
+
+    fn reset_layout_retry(&mut self) {
+        self.retry = None;
+        self.backoff = FIRST_LAYOUT_RETRY;
+    }
+
+    /// The retry timer fired: fetch again (cache first, then Oryx), but only if the failure it
+    /// was scheduled for is still the current state.
+    fn on_retry_layout(&mut self) -> Vec<Effect> {
+        if self.retry.is_none() || !matches!(self.layout, LayoutState::Unavailable(_)) {
+            return Vec::new();
+        }
+        let Connection::Connected {
+            model,
+            ids: Some(ids),
+            ..
+        } = &self.connection
+        else {
+            return Vec::new();
+        };
+        let effect = Effect::FetchLayout {
+            model: *model,
+            ids: ids.clone(),
+            force: false,
+        };
+        self.retry = None;
+        self.layout = LayoutState::Loading;
+        vec![effect]
     }
 }

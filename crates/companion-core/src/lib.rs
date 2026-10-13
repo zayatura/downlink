@@ -5,5 +5,7 @@ mod engine;
 mod tray_view;
 
 pub use config::{Appearance, Config};
-pub use engine::{Connection, Effect, Engine, Input, LayoutState};
+pub use engine::{
+    Connection, Effect, Engine, FIRST_LAYOUT_RETRY, Input, LayoutState, MAX_LAYOUT_RETRY,
+};
 pub use tray_view::TrayView;
