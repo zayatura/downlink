@@ -256,10 +256,12 @@ impl App {
             Ok(tray) => self.tray = Some(tray),
             Err(error) => tracing::error!(%error, "could not create the menu-bar icon"),
         }
-        if self.engine.config().launch_at_login
-            && let Err(error) = platform::set_launch_at_login(true)
-        {
-            tracing::warn!(%error, "could not refresh the login item");
+        if self.engine.config().launch_at_login {
+            match platform::refresh_launch_at_login() {
+                Ok(true) => tracing::info!("updated the login item"),
+                Ok(false) => {}
+                Err(error) => tracing::warn!(%error, "could not refresh the login item"),
+            }
         }
         self.refresh_sources();
         self.sync_current_source();
