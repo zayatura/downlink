@@ -470,7 +470,21 @@ on unplug and on quit; theme follows the OS appearance live; launch at login aft
 - **Toolchain:** stable Rust via `rustup`. The minimum supported Rust version is whatever iced
   0.14 requires.
 
-## 13. Risks
+## 13. Licensing and legal guardrails
+
+Downlink is **MIT-licensed** (`LICENSE`, copyright holder "zayatura"). Every crate sets
+`license = "MIT"`.
+
+| Source | Its license or status | How Downlink uses it | Rule |
+|--------|-----------------------|----------------------|------|
+| `zsa/qmk_modules` (`oryx.c/h`), `zsa/qmk_firmware` | GPL-2.0 | Read to learn the wire protocol: byte codes and packet layout | **Never copy code or comments** from GPL sources. Write an independent implementation with our own names. Protocol facts (codes, packet layout) are not copied expression. |
+| Voyager `keyboard.json` (QMK) | GPL-2.0 | Physical key coordinates and matrix positions | Store them as our own data table holding only the numeric facts, with a comment naming the source. Don't vendor the file. |
+| Keymapp 1.3.7 | Proprietary ("All Rights Reserved" in `Info.plist`; no EULA found in the bundle or on zsa.io) | Studied for interoperability only: symbol names, strings, its local API, the user's own local database. No decompilation. | Ship **no** Keymapp code, assets, or text. Downlink neither contains nor links to Keymapp. |
+| `zsa/kontroll` | MIT | ZSA's published proto for Keymapp's API, for reference only | Not needed: Downlink doesn't talk to Keymapp. |
+| Oryx GraphQL and `metadata.json` | Undocumented web API; terms not retrievable (the page is rendered by JavaScript) | Fetch only the user's own flashed layout, one request per new revision, plus the metadata | Cache aggressively. Send an honest `User-Agent: Downlink/<version> (+<repo URL>)` with no personal data. Don't scrape or crawl. |
+| Trademarks: ZSA, Voyager, Oryx, Keymapp | ZSA's | Only to describe compatibility ("for the ZSA Voyager") | Never in the app name, icon or bundle ID. The README states "not affiliated with or endorsed by ZSA Technology Labs". |
+
+## 14. Risks
 
 | Risk | Mitigation |
 |------|------------|
