@@ -32,9 +32,10 @@ The real data also confirms the matrix → Oryx mapping. Holding matrix (5,0) ra
   fallback input source would not be selected.
 - **Fix (both options below):** on macOS, Downlink installs its own app menu with muda
   (`Menu::init_for_nsapp`), replacing winit's. Its ⌘Q item sends a normal menu event that the
-  app handles. **Open decision for the human partner:** should ⌘Q in a Downlink window
-  (A) quit Downlink through the normal Quit path, or (B) only close the window, with Quit
-  available solely from the menu-bar menu?
+  app handles.
+- **Decided: option B.** ⌘W and ⌘Q in a Downlink window close only that window. Quitting
+  happens solely from the menu-bar menu's **Quit Downlink**, which runs the normal Quit path:
+  select the fallback, shut down the device thread, then exit.
 
 ## Theme
 
@@ -58,7 +59,9 @@ renders with the fallback (light) palette.
    `appearance_from_interface_style` is tested.
 4. **Task 6, protocol tests:** a new test asserts the firmware-version text stops at the stop
    byte even when garbage follows it.
-5. **Task 20 and spec §8, ⌘Q:** pending the open decision above. Both options replace winit's
-   default menu with a muda app menu, and the exit safety net stays as a backstop only.
+5. **Task 20 and spec §6.1 / §8, ⌘Q (option B):** `tray::AppMenu` installs a muda app menu
+   (`init_for_nsapp`) whose ⌘W/⌘Q items map to `MenuAction::CloseWindow`. The pure function
+   `menu_action` is tested so that only the menu-bar Quit item quits. The exit safety net stays
+   as a backstop only.
 6. **Spec §4.6 and §14:** questions 1–5 are marked resolved; the Input Monitoring risk row is
    closed.

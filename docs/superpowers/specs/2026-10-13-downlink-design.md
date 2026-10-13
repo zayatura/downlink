@@ -327,6 +327,10 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
   7. **Pause Input Switching** (checkmark when on; not saved, resets on launch)
   8. —
   9. **Quit Downlink** (⌘Q)
+- **In Downlink's windows, ⌘W and ⌘Q close the focused window only.** Downlink keeps running in
+  the menu bar; quitting happens only through the menu's **Quit Downlink**. This was decided after
+  Phase 0, so that an accidental ⌘Q never silently stops input-source switching. A muda app menu
+  replaces winit's default one, which would otherwise call `NSApp terminate:`.
 
 ### 6.2 Layout window (approved: option A, "layer tabs on top")
 
@@ -433,7 +437,7 @@ macOS.)
 |-----------|----------|
 | Keyboard unplugged, or the host sleeps | A read error leads to `Disconnected`, then rule 6.4.2 (fallback), then enumerating every 1 s again. The menu says "Waiting for Voyager…". |
 | Host wakes but the keyboard stayed attached | The firmware may have dropped pairing during sleep. The 5 s heartbeat sends `PAIRING_INIT` again, and events resume. |
-| ⌘Q in a Downlink window | winit's default app menu would call `NSApp terminate:` and end the process outside Downlink's Quit path (Phase 0). Downlink replaces that menu with its own muda app menu, whose ⌘Q item goes through Downlink's own handling. (The behaviour itself is an open decision recorded in the Phase 0 findings.) |
+| ⌘Q in a Downlink window | winit's default app menu would call `NSApp terminate:` and end the process outside Downlink's Quit path (Phase 0). Downlink replaces that menu with its own muda app menu, in which ⌘W and ⌘Q close the focused window and Downlink keeps running (§6.1). |
 | The event loop returns without going through Quit | `main` checks whether the Quit path already ran. If not, it reloads the config and selects the fallback source. This is a backstop only. |
 | The HID interface won't open (permission denied, busy) | The menu shows "Can't open keyboard: {reason}". Retry with backoff (1 s, doubling up to 10 s). |
 | No `PAIRING_SUCCESS` or `LAYER` within 2 s | Treated as non-Oryx firmware: `Unsupported`, the menu says so, and switching is inactive. Check again on the next reconnect. |
