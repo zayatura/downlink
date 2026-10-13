@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Downlink — Layout window mockup</title>
+<!--
+  Approved during brainstorming (2026-10-13): option A, "layer tabs on top".
+  Rendered from a real Oryx layout (layer 0) using the Voyager's physical key
+  positions from QMK's keyboard.json. Keys T and N are shown pressed to
+  demonstrate the live highlight. See ../specs/2026-10-13-downlink-design.md.
+-->
+<style>
+  body { margin:0; padding:24px; background:#888c94; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,sans-serif; }
+  .dl { --bg:#1d1f24; --panel:#25282f; --key:#30343c; --keyText:#e8eaee; --sub:#9aa1ad; --accent:#4cc2ff; --press:#ffb547; --chip:#30343c; --border:#3a3f48; }
+  .dl.light { --bg:#f4f5f7; --panel:#ffffff; --key:#e9ebef; --keyText:#1d2025; --sub:#6b7280; --accent:#0a84ff; --press:#ff9f0a; --chip:#e9ebef; --border:#d6d9df; }
+  .dl { background:var(--bg); color:var(--keyText); border-radius:12px; padding:14px; border:1px solid var(--border); width:max-content; margin-bottom:20px; }
+  .dl .kb { position:relative; margin:6px auto; }
+  .dl .k { position:absolute; box-sizing:border-box; border-radius:7px; background:var(--key); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:13px; line-height:1.1; text-align:center; }
+  .dl .k .h { font-size:9px; color:var(--sub); margin-top:2px; }
+  .dl .k.empty { opacity:.45; }
+  .dl .k.pressed { background:var(--press); color:#1d1f24; border-color:var(--press); }
+  .dl .k.pressed .h { color:#3a2a00; }
+  .dl .k.layer { border-color:var(--accent); }
+  .dl .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .dl .chip { padding:3px 10px; border-radius:999px; background:var(--chip); font-size:12px; color:var(--sub); }
+  .dl .chip.on { background:var(--accent); color:#fff; }
+  .dl .status { display:flex; gap:14px; font-size:12px; color:var(--sub); margin-top:8px; align-items:center; }
+  .dl .dot { width:8px; height:8px; border-radius:50%; background:#30d158; display:inline-block; margin-right:5px; }
+  .dl .badge { background:var(--panel); border:1px solid var(--border); padding:2px 8px; border-radius:6px; color:var(--keyText); }
+</style>
+</head>
+<body>
+  <div class="dl"><div class="chips" data-chips></div><div class="kb" data-kb></div>
+    <div class="status"><span><span class="dot"></span>Voyager connected</span><span>MiraMod · rev m57mrj</span><span class="badge">⌨ English – Voyager</span></div></div>
+  <div class="dl light"><div class="chips" data-chips></div><div class="kb" data-kb></div>
+    <div class="status"><span><span class="dot"></span>Voyager connected</span><span>MiraMod · rev m57mrj</span><span class="badge">⌨ English – Voyager</span></div></div>
+<script>
+  // Oryx key order: left rows (6x4), left thumbs (2), right rows (6x4), right thumbs (2)
+  const L = [
+    ["",""],["HU","TO"],["",""],["",""],["",""],["",""],
+    ["Del",""],["Q",""],["W",""],["F",""],["P",""],["B",""],
+    ["Esc",""],["A","Ctrl"],["R","Alt"],["S","Cmd"],["T","Shift"],["G",""],
+    ["Caps W",""],["Z","Media"],["X",""],["C",""],["D","Sym R"],["V",""],
+    ["Space","Navig"],["Tab","Mouse"],
+    ["",""],["",""],["",""],["",""],["",""],["RO","TO"],
+    ["J",""],["L",""],["U",""],["Y",""],[";",""],["-",""],
+    ["M",""],["N","Shift"],["E","Cmd"],["I","Alt"],["O","Ctrl"],["'",""],
+    ["K",""],["H","Sym L"],[",",""],[".",""],["/",""],[":",""],
+    ["Enter","Fun"],["Bksp","Num"]
+  ];
+  const yL=[0.5,0.5,0.25,0,0.25,0.5], yR=[0.5,0.25,0,0.25,0.5,0.5], pos=[];
+  for(let r=0;r<4;r++) for(let c=0;c<6;c++) pos.push([c, yL[c]+r]);
+  pos.push([5,4.5],[6,4.75]);
+  for(let r=0;r<4;r++) for(let c=0;c<6;c++) pos.push([10+c, yR[c]+r]);
+  pos.push([9,4.75],[10,4.5]);
+  const pressed=new Set([16,39]), u=44, g=3;
+  const layers=["Main","RO","HU","Navig","Num","Sym R","Sym L","Mouse","Fun","Media","RO temp","HU temp"];
+  document.querySelectorAll('[data-kb]').forEach(kb=>{
+    kb.style.width=(16*u)+'px'; kb.style.height=(5.75*u)+'px';
+    pos.forEach((p,i)=>{ const d=document.createElement('div'), [t,h]=L[i];
+      d.className='k'+(t===''?' empty':'')+(pressed.has(i)?' pressed':'')+(h==='TO'?' layer':'');
+      Object.assign(d.style,{left:(p[0]*u+g/2)+'px',top:(p[1]*u+g/2)+'px',width:(u-g)+'px',height:(u-g)+'px'});
+      d.innerHTML=t+(h?'<span class="h">'+h+'</span>':''); kb.appendChild(d); });
+  });
+  document.querySelectorAll('[data-chips]').forEach(el=>{
+    el.innerHTML=layers.map((l,i)=>'<span class="chip'+(i===0?' on':'')+'">'+l+'</span>').join(''); });
+</script>
+</body>
+</html>

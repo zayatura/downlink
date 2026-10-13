@@ -1,0 +1,8 @@
+# Rust build output
+/target/
+
+# Visual-companion session files (approved mockups are copied to docs/superpowers/mockups/)
+/.superpowers/
+
+# macOS
+.DS_Store

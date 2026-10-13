@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Downlink — Menu bar and Settings mockup</title>
+<!--
+  Approved during brainstorming (2026-10-13):
+  - Menu bar: option A, icon only (dimmed when disconnected). macOS already
+    shows the input source in its own menu bar item.
+  - Menu and Settings window as shown.
+  See ../specs/2026-10-13-downlink-design.md.
+-->
+<style>
+  body { margin:0; padding:24px; background:#888c94; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,sans-serif; display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .dm { --bar:#2a2c31; --barText:#f2f3f5; --menu:#2b2d33; --text:#eceef1; --sub:#9aa1ad; --sep:#454a53; --accent:#4cc2ff; --win:#1d1f24; --panel:#25282f; --ctrl:#30343c; --border:#3a3f48; color:var(--text); }
+  .dm.light { --bar:#e8e8ea; --barText:#1d1f24; --menu:#f6f6f7; --text:#1d1f24; --sub:#6b7280; --sep:#d6d9df; --accent:#0a84ff; --win:#f4f5f7; --panel:#ffffff; --ctrl:#e9ebef; --border:#d6d9df; }
+  .dm .bar { background:var(--bar); color:var(--barText); border-radius:8px; padding:5px 12px; display:flex; justify-content:flex-end; gap:16px; font-size:13px; width:300px; }
+  .dm .bar .mine { background:color-mix(in srgb, var(--accent) 25%, transparent); border-radius:5px; padding:1px 7px; }
+  .dm .bar .dim { opacity:.6; }
+  .dm .menu { background:var(--menu); border:1px solid var(--border); border-radius:10px; width:300px; padding:5px; font-size:13px; margin-top:6px; }
+  .dm .mi { padding:4px 10px; display:flex; justify-content:space-between; }
+  .dm .mi.hdr, .dm .mi.dis, .dm .mi .sc { color:var(--sub); }
+  .dm .sep { height:1px; background:var(--sep); margin:5px 8px; }
+  .dm .win { background:var(--win); border:1px solid var(--border); border-radius:12px; overflow:hidden; width:540px; }
+  .dm .tb { padding:8px 12px; display:flex; gap:7px; align-items:center; border-bottom:1px solid var(--border); font-size:13px; }
+  .dm .tl { width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .dm .body { padding:14px 18px; display:grid; gap:16px; }
+  .dm h4 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--sub); }
+  .dm .card { background:var(--panel); border:1px solid var(--border); border-radius:9px; }
+  .dm .r { display:flex; justify-content:space-between; align-items:center; padding:7px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  .dm .r:last-child { border-bottom:none; }
+  .dm .sel { background:var(--ctrl); border:1px solid var(--border); border-radius:6px; padding:2px 10px; min-width:170px; display:flex; justify-content:space-between; }
+  .dm .sel.none { color:var(--sub); }
+  .dm .seg { display:inline-flex; background:var(--ctrl); border-radius:7px; padding:2px; }
+  .dm .seg span { padding:2px 12px; border-radius:5px; font-size:12px; }
+  .dm .seg span.on { background:var(--accent); color:#fff; }
+  .dm .tog { width:34px; height:20px; border-radius:10px; background:var(--accent); position:relative; display:inline-block; }
+  .dm .tog::after { content:""; position:absolute; right:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; }
+  .dm .note { font-size:11px; color:var(--sub); padding:6px 12px 8px; }
+  .dm .btn { background:var(--ctrl); border:1px solid var(--border); border-radius:6px; padding:2px 10px; font-size:12px; }
+  .dm .lnum { color:var(--sub); display:inline-block; width:22px; }
+</style>
+</head>
+<body>
+<div class="dm">
+  <div class="bar"><span class="dim">🔋</span><span class="mine">📡</span><span class="dim">Wi-Fi</span><span class="dim">Tue 12:04</span></div>
+  <div class="menu">
+    <div class="mi hdr"><span>● Voyager connected</span></div>
+    <div class="mi dis"><span>Layer: Main · Input: English – Voyager</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Show Layout</span><span class="sc">⌘L</span></div>
+    <div class="mi"><span>Settings…</span><span class="sc">⌘,</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Pause Input Switching</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Quit Downlink</span><span class="sc">⌘Q</span></div>
+  </div>
+</div>
+<div class="dm"><div class="win" data-settings></div></div>
+<div class="dm light"><div class="win" data-settings></div></div>
+<script>
+  const layers=[["Main","English – Voyager"],["RO","Romanian – Voyager"],["HU","Hungarian – Voyager"],["Navig",""],["Num",""],["Sym R",""],["Sym L",""],["Mouse",""],["Fun",""],["Media",""],["RO temp",""],["HU temp",""]];
+  const map=layers.map((l,i)=>'<div class="r"><span><span class="lnum">'+i+'</span>'+l[0]+'</span><span class="sel'+(l[1]?'':' none')+'">'+(l[1]||'No change')+' <span>▾</span></span></div>').join('');
+  const html='<div class="tb"><span class="tl" style="background:#ff5f57"></span><span class="tl" style="background:#febc2e"></span><span class="tl" style="background:#28c840"></span><span style="margin-left:10px">Downlink Settings</span></div>'+
+    '<div class="body">'+
+    '<div><h4>Input source per layer</h4><div class="card">'+map+'</div><div class="note">“No change” = transient layer: keep whatever is active. Sources are read live from the OS.</div></div>'+
+    '<div><h4>When the keyboard disconnects or Downlink quits</h4><div class="card"><div class="r"><span>Switch to</span><span class="sel">English – Voyager <span>▾</span></span></div></div></div>'+
+    '<div><h4>General</h4><div class="card"><div class="r"><span>Appearance</span><span class="seg"><span class="on">System</span><span>Light</span><span>Dark</span></span></div><div class="r"><span>Launch at login</span><span class="tog"></span></div></div></div>'+
+    '<div><h4>Keyboard</h4><div class="card"><div class="r"><span>Voyager · MiraMod</span><span style="color:var(--sub)">rev m57mrj · protocol v5</span></div><div class="r"><span>Layout data</span><span><span style="color:var(--sub); margin-right:8px">cached 2 min ago</span><span class="btn">Refresh from Oryx</span></span></div></div></div>'+
+    '</div>';
+  document.querySelectorAll('[data-settings]').forEach(el=>el.innerHTML=html);
+</script>
+</body>
+</html>
