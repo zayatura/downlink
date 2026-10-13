@@ -1,0 +1,11 @@
+[package]
+name = "oryx-protocol"
+description = "Oryx raw-HID wire protocol used by ZSA keyboards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true

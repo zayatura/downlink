@@ -313,9 +313,15 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
 
 ### 6.1 Menu bar (approved: icon only)
 
-- A monochrome template icon (an antenna glyph), drawn normally when connected and dimmed or
-  outlined when disconnected or not working. No text next to it, because macOS already shows the
-  input source.
+- A monochrome template icon, the **Downlink key**: a keycap seen from above with a down-arrow
+  legend. It is drawn normally when connected and dimmed (35% opacity) when disconnected or not
+  working. No text sits next to it, because macOS already shows the input source.
+  - It replaced the original antenna glyph, which read like a Wi-Fi symbol.
+  - It was chosen on 2026-10-13 from five original concepts. "Probe" (a stylised Voyager probe
+    beaming down to Earth) came a close second and is a candidate for the app icon later.
+  - The icon is drawn once as SVG (`crates/downlink/assets/menubar-icon.svg`, plus
+    `app-icon.svg` with the same glyph in the accent colour on a dark rounded square). It is
+    rasterised with resvg at every size: menu bar, `.iconset` and app bundle.
 - The menu, from top to bottom:
   1. Status (disabled item): "● Voyager connected" / "Waiting for Voyager…" /
      "Firmware doesn't report live data" / "Can't open keyboard: {reason}".

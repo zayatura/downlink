@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36">
+  <!-- Downlink key: a keycap seen from above with a down-arrow legend. Template image: black + alpha. -->
+  <path fill="#000" fill-rule="evenodd" d="M10 3 H26 A7 7 0 0 1 33 10 V26 A7 7 0 0 1 26 33 H10 A7 7 0 0 1 3 26 V10 A7 7 0 0 1 10 3 Z M12 7 H24 A4 4 0 0 1 28 11 V22 A4 4 0 0 1 24 26 H12 A4 4 0 0 1 8 22 V11 A4 4 0 0 1 12 7 Z"/>
+  <rect x="16.4" y="10" width="3.2" height="7.5" rx="1" fill="#000"/>
+  <path d="M12 15.5 H24 L18 22.5 Z" fill="#000" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+</svg>

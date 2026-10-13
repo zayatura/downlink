@@ -1,0 +1,24 @@
+[package]
+name = "oryx-device"
+description = "Discovery, handshake and event stream for a ZSA keyboard's Oryx raw-HID interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["hid"]
+hid = ["dep:hidapi"]
+
+[dependencies]
+oryx-protocol.workspace = true
+tracing.workspace = true
+hidapi = { version = "2.6", features = ["macos-shared-device"], optional = true }
+
+[[example]]
+name = "watch"
+required-features = ["hid"]
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
