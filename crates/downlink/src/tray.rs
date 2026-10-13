@@ -156,7 +156,7 @@ fn accelerator(spec: &str) -> Option<Accelerator> {
 }
 
 fn tray_icon_image(connected: bool) -> Result<Icon, String> {
-    Icon::from_rgba(icon::antenna_rgba(ICON_PX, connected), ICON_PX, ICON_PX)
+    Icon::from_rgba(icon::menubar_rgba(ICON_PX, connected), ICON_PX, ICON_PX)
         .map_err(|e| e.to_string())
 }
 
