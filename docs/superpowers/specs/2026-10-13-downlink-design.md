@@ -127,10 +127,18 @@ Key facts from the firmware source:
 - Each key has `tap`, `hold`, `doubleTap` and `tapHold` actions, each
   `{ code, layer, modifiers, macro, … }` or null, plus `customLabel`, `emoji`, `icon` and
   `glowColor`.
-- **Keycode label catalogue:** `GET https://configure.zsa.io/metadata.json?release=<ver>`, which
-  Keymapp reaches by a redirect from `keymapp-startup-data.json`. It holds about 2,500 keycodes:
-  `{ code, label, glyph, searchLabel, … }` and 61 categories. Some common codes (for example
-  `KC_BSPC`) have no label, so Downlink needs its own built-in label table as a fallback.
+- **Keycode label catalogue (not used in v1):** Keymapp also downloads
+  `https://configure.zsa.io/metadata.json?release=<ver>` (about 2,500 keycodes). Its labels are
+  verbose ("Arrow left", "Volume up"), and 20 of the 143 codes in a real layout are missing from
+  it (`KC_BSPC`, `KC_LEFT_CTRL`, `KC_SCLN`, …). So Downlink ships its own compact label table and
+  doesn't fetch the catalogue.
+- **Transparent keys (verified from the generated `keymap.c` in the revision's `zipUrl`):** an
+  action slot that is `null` compiles to `KC_TRANSPARENT`. A key whose four slots are all null is
+  transparent, on every layer including layer 0. Explicit no-op keys use the code `KC_NO`.
+- Tap plus hold compiles to QMK's `LT(layer, key)` (hold is `MO`) or `MT(mod, key)` (hold is a
+  modifier keycode such as `KC_LEFT_CTRL`). Modifier-wrapped actions carry an 8-boolean
+  `modifiers` object (`leftCtrl` … `rightShift`). Accented characters are usually given as
+  `customLabel`.
 
 ### 4.5 Key order and geometry
 
@@ -162,8 +170,8 @@ Key facts from the firmware source:
    because input methods (as opposed to plain keyboard layouts) sometimes don't switch.
 5. Whether `tray-icon` can be created and driven inside an iced 0.14 `daemon` on macOS. It must
    be created on the main thread after the event loop starts.
-6. How Oryx encodes a transparent key (one that falls through to the layer below) compared with
-   a no-op key.
+6. ~~How Oryx encodes a transparent key compared with a no-op key.~~ **Resolved during
+   planning:** see section 4.4.
 
 ## 5. Architecture
 
@@ -183,44 +191,64 @@ Cargo workspace (repo root)
 └─ docs/
 ```
 
-Dependency direction: `downlink` depends on everything. `companion-core` depends on
-`oryx-protocol`, `oryx-layout` (model types) and `input-source` (trait only). The other crates
-don't depend on each other except `oryx-device → oryx-protocol`.
+Dependency direction: `downlink` depends on everything. `oryx-device` and `oryx-layout` depend
+only on `oryx-protocol`. `companion-core` depends on `oryx-protocol`, `oryx-device` (built
+without its `hid` feature, types only) and `oryx-layout` (built without its `client` feature,
+model and geometry only). So the core engine compiles without hidapi or reqwest.
 
 ### 5.2 Crates
 
 **`oryx-protocol`** — `enum Command { GetFwVersion, PairingInit, GetProtocolVersion,
-Disconnect, SetLayer { on, layer } }` and `fn encode(&Command) -> [u8; 32]`. Also
-`enum Event { FwVersion { layout_id, revision_id }, PairingSuccess, Layer(u8),
-KeyDown { col, row }, KeyUp { col, row }, ProtocolVersion(u8), Error(u8), Unknown(u8) }` and
-`fn decode(&[u8]) -> Result<Event, DecodeError>`. It's tested with captured packets.
+SetLayer { on, layer } }` with `Command::encode() -> [u8; 32]`. `DISCONNECT` (0x03) is not
+included, because the v5 firmware has no handler for it. Also
+`enum Event { FwVersion(String), PairingSuccess, PairingFailed, Layer(u8), KeyDown(MatrixPos),
+KeyUp(MatrixPos), ProtocolVersion(u8), Error(u8), Unknown(u8) }` with
+`Event::decode(&[u8]) -> Result<Event, DecodeError>`. It also holds the small shared types:
+- `MatrixPos { row, col }`;
+- `Model` (Voyager only for now: vendor/product IDs and its Oryx geometry name);
+- `LayoutIds`, which parses `layoutId/revisionId` and accepts only 1–32 ASCII alphanumerics per
+  part, so the IDs are safe to use as file names.
+
+It's tested with hand-built and captured packets.
 
 **`oryx-device`** — runs a dedicated thread built on the `hidapi` crate (IOKit on macOS, hidraw
 on Linux). It finds the device by vendor ID, product ID, usage page and usage.
 - The loop:
   - Disconnected: enumerate every 1 s.
-  - On a match: open it, send `PAIRING_INIT`, `GET_FW_VERSION` and `GET_PROTOCOL_VERSION`, then
+  - On a match: open it and send `GET_FW_VERSION`, `GET_PROTOCOL_VERSION`, then `PAIRING_INIT`.
+    The replies come back in that order, so the IDs are known before `Connected` is reported. Then
     `read_timeout(100 ms)` in a loop.
   - On a read or write error: report `Disconnected` and go back to enumerating.
-- It sends out `DeviceEvent { Connected { layout_id, revision_id, protocol }, Layer(u8),
-  KeyDown(MatrixPos), KeyUp(MatrixPos), Disconnected { reason }, Unsupported { reason } }`.
-- It takes in `DeviceCommand { Shutdown, Send(Command) }`.
+- **Heartbeat:** if no packet arrives for 5 s, send `PAIRING_INIT` again. The firmware clears its
+  paired state whenever a send fails, for example while the host sleeps. Without the heartbeat, a
+  keyboard still attached after wake would go silent. Repeated pairing replies are absorbed by
+  the session, and repeated layer events by the engine.
+- The handshake and heartbeat logic is a sans-IO `Session` (explicit `Instant`s, no threads), so
+  it's unit-tested. The thread loop is thin glue over `Discovery` and `Transport` traits and is
+  tested with fakes.
+- hidapi uses the `macos-shared-device` feature, so the interface is opened shared rather than
+  exclusive. hidapi lives behind a default-on `hid` feature.
+- It sends out `DeviceEvent { Connected { model, ids: Option<LayoutIds>, protocol }, Layer(u8),
+  KeyDown(MatrixPos), KeyUp(MatrixPos), Disconnected { reason }, Unsupported { reason },
+  OpenFailed { reason } }`.
+- It takes in `DeviceCommand { Send(Command), Shutdown }`.
 - The USB serial number is used as a fallback for the layout and revision IDs if
   `GET_FW_VERSION` doesn't answer.
 - It has a `Transport` trait, so tests can replace hidapi with a fake.
 
-**`oryx-layout`** — `async fn fetch_layout(layout_id, revision_id, geometry)` uses `reqwest`
-with rustls and sends the GraphQL query from section 4.4. It also has
-`async fn fetch_metadata(release)` and a `LayoutCache`, which stores one JSON file per revision
-ID plus the metadata. The model:
+**`oryx-layout`** — `async fn fetch_layout(...)` uses `reqwest`, behind a default-on `client`
+feature, with a 15 s timeout. It sends the GraphQL query from section 4.4 and returns the raw
+JSON. `LayoutCache` stores that raw JSON as one file per `LayoutIds`, and it is parsed on load,
+so model changes never invalidate the cache. The model:
 - `Layout { title, layout_id, revision_id, layers: Vec<Layer> }`
 - `Layer { index, title, color, keys: [KeyAction; 52] }`
 - `KeyAction { tap, hold, double_tap, tap_hold, custom_label }`
 
 The **Voyager geometry** is a static table taken from `keyboard.json`, with Oryx index ↔ matrix
 ↔ `(x, y)`. **Labels** turn an `Action` into display text in this order: custom label, then the
-metadata catalogue, then a built-in fallback table, then the raw code. Layer actions render as
-"→ {layer title}" (TO/TG/DF) or "hold: {layer title}" (MO/LT/OSL).
+built-in compact table, then the raw code with `KC_` stripped. Layer actions render as
+"→ {layer title}" (TO/DF), "⇆ {layer title}" (TG), "1× {layer title}" (OSL), or just the layer
+title (MO/TT/LM, and any hold that targets a layer).
 
 **`input-source`** — the platform interface:
 ```rust
@@ -238,10 +266,12 @@ tests. Linux implementations come later, behind `#[cfg(target_os = "linux")]`.
 
 **`companion-core`** — `Engine` is a pure state machine:
 `fn handle(&mut self, input: Input) -> Vec<Effect>`.
-- `Input` = `Device(DeviceEvent)`, `LayoutLoaded(Result<Layout>)`, `CurrentSourceChanged(id)`,
-  `ConfigChanged(Config)`, `SetPaused(bool)`, `PreviewLayer(Option<u8>)`, `Quit`.
-- `Effect` = `SelectInputSource(id)`, `FetchLayout { layout_id, revision_id }`,
-  `PersistConfig`, `RefreshTray`, `Exit`.
+- `Input` = `Device(DeviceEvent)`, `LayoutLoaded { ids, result }`,
+  `CurrentSourceChanged(Option<id>)`, `SelectFailed(id)`, `ConfigChanged(Config)`,
+  `SetPaused(bool)`, `PreviewLayer(Option<u8>)`, `RefreshLayout`, `Quit`.
+- `Effect` = `SelectInputSource(id)`, `FetchLayout { model, ids, force }`, `PersistConfig`,
+  `RefreshTray`, `Exit`.
+- `SelectFailed` clears "last selected", so the next layer change tries again (section 8).
 - The state is the connection state, the layout and revision IDs, the active layer, the pressed
   set (Oryx indices, cleared on disconnect only), the last source Downlink selected, `paused`,
   the preview layer and config.
@@ -304,8 +334,8 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
   - The tap legend is large. The hold legend is smaller underneath.
   - Modifiers use ⌃ ⌥ ⌘ ⇧ on macOS and words on Linux.
   - Layer keys get the accent border and the target layer's name.
-  - Empty or no-op keys are dimmed. Transparent keys are dimmed and marked once their encoding
-    is confirmed (section 4.6, item 6).
+  - No-op keys (`KC_NO`) are blank and dimmed. Transparent keys (all slots null) are dimmed and
+    show "▽".
   - **Pressed keys** fill with the press colour from `KEYDOWN` until `KEYUP`. Highlights are
     tied to physical key positions, so a held layer key stays lit after the layer changes. All
     pressed highlights clear on disconnect, so a missed `KEYUP` can't leave a key stuck.
@@ -334,7 +364,9 @@ Changes take effect immediately and are saved straight away. There is no Save bu
    - if `L` is mapped to source `S` and `S` ≠ the last source Downlink selected, select `S`;
    - if `L` is "No change" (transient), do nothing.
 2. When the keyboard disconnects (or is unsupported) and a fallback is set, select the fallback.
-   Then forget the last-selected source, so the next connect switches again.
+   Then forget the last-selected source, so the next connect switches again. This fires only on
+   a *transition*: Connected → any other state, or any state → Unsupported. Repeated
+   `OpenFailed` retries, or starting up with no keyboard, never re-select.
 3. On quit, select the fallback (if set) before exiting.
 4. On connect, the first `LAYER` event (sent right after pairing) applies rule 1.
 5. If the user changes the input source by hand, Downlink doesn't fight it. Rule 1 only acts on
@@ -382,13 +414,18 @@ titles next to indices so this is visible.
 | Logs (rotating, `tracing`) | `~/Library/Logs/Downlink/` | `$XDG_STATE_HOME/downlink/` |
 | Single-instance lock | in the cache dir | in `$XDG_RUNTIME_DIR` |
 
-Paths come from the `directories` crate where possible.
+The base directories come from the `dirs` crate (`config_dir`, `cache_dir`, `home_dir`,
+`state_dir`, `runtime_dir`), and the `Downlink` / `downlink` folder names are appended
+explicitly. (`directories::ProjectDirs` would produce `com.zayatura.Downlink` folder names on
+macOS.)
 
 ## 8. Errors and edge cases
 
 | Situation | Behavior |
 |-----------|----------|
 | Keyboard unplugged, or the host sleeps | A read error leads to `Disconnected`, then rule 6.4.2 (fallback), then enumerating every 1 s again. The menu says "Waiting for Voyager…". |
+| Host wakes but the keyboard stayed attached | The firmware may have dropped pairing during sleep. The 5 s heartbeat sends `PAIRING_INIT` again, and events resume. |
+| iced exits without going through Quit (for example ⌘Q in a window) | After the event loop returns, `main` checks whether the Quit path already ran. If not, it reloads the config and selects the fallback source. |
 | The HID interface won't open (permission denied, busy) | The menu shows "Can't open keyboard: {reason}". Retry with backoff (1 s, doubling up to 10 s). |
 | No `PAIRING_SUCCESS` or `LAYER` within 2 s | Treated as non-Oryx firmware: `Unsupported`, the menu says so, and switching is inactive. Check again on the next reconnect. |
 | Protocol version below 4 or above 5 | Log a warning and carry on; only the core events are used. |
