@@ -75,3 +75,48 @@ fn a_corrupt_file_is_moved_aside_and_the_warning_is_logged() {
         "the backup name is the only record: {text}"
     );
 }
+
+#[test]
+fn first_run_writes_the_defaults() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested/config.toml");
+
+    let config = downlink::load_or_create_config(&path);
+
+    assert_eq!(config, companion_core::Config::default());
+    assert!(path.is_file(), "the settings file is created");
+    let loaded = companion_core::config::load(&path);
+    assert_eq!(loaded.config, companion_core::Config::default());
+    assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+}
+
+#[test]
+fn an_existing_file_is_not_rewritten() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.toml");
+    let text = "# my notes\n[switching]\nfallback = \"com.example.en\"\n";
+    std::fs::write(&path, text).unwrap();
+
+    let config = downlink::load_or_create_config(&path);
+
+    assert_eq!(config.fallback.as_deref(), Some("com.example.en"));
+    assert_eq!(std::fs::read(&path).unwrap(), text.as_bytes());
+}
+
+#[test]
+fn a_corrupt_file_is_moved_aside_and_not_replaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.toml");
+    std::fs::write(&path, "this is = = not toml").unwrap();
+
+    let config = downlink::load_or_create_config(&path);
+
+    assert_eq!(config, companion_core::Config::default());
+    assert!(!path.exists(), "no fresh file over a file the user wrote");
+    let backups: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("config.toml.bad-"))
+        .collect();
+    assert_eq!(backups.len(), 1, "{backups:?}");
+}

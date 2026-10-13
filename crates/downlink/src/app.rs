@@ -73,7 +73,7 @@ pub struct App {
 
 impl App {
     pub fn boot(paths: Paths) -> (App, Task<Message>) {
-        let config = crate::load_config_logged(&paths.config_file);
+        let config = crate::load_or_create_config(&paths.config_file);
         let http = match client::client_builder(env!("CARGO_PKG_VERSION")).build() {
             Ok(http) => Some(http),
             Err(error) => {

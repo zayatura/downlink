@@ -85,3 +85,18 @@ pub fn load_config_logged(path: &Path) -> companion_core::Config {
     }
     loaded.config
 }
+
+/// Like `load_config_logged`, but on the first run (the file doesn't exist) it also writes the
+/// defaults, so there is a file to edit (spec §7). It never writes after a file that exists but
+/// couldn't be read or parsed: that file belongs to the user, and the load moved it aside.
+pub fn load_or_create_config(path: &Path) -> companion_core::Config {
+    let first_run = matches!(path.try_exists(), Ok(false));
+    let config = load_config_logged(path);
+    if first_run {
+        match companion_core::config::save(path, &config) {
+            Ok(()) => tracing::info!("created the settings file with defaults"),
+            Err(error) => tracing::warn!(%error, "could not create the settings file"),
+        }
+    }
+    config
+}
