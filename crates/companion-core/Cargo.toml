@@ -1,0 +1,18 @@
+[package]
+name = "companion-core"
+description = "Downlink's pure engine: switching rules, view state and configuration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+oryx-protocol.workspace = true
+oryx-device.workspace = true
+oryx-layout.workspace = true
+toml = "1"
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
