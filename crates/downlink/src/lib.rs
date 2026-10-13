@@ -12,7 +12,7 @@ pub mod theme;
 
 mod device;
 pub mod layout_view;
-mod settings_view;
+pub mod settings_view;
 pub mod tray;
 
 use std::path::Path;
