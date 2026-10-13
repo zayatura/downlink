@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod icon;
+pub mod layout_fetch;
 pub mod logging;
 pub mod paths;
 pub mod platform;
@@ -14,6 +15,7 @@ mod layout_view;
 mod settings_view;
 pub mod tray;
 
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::Ordering;
 
@@ -61,9 +63,9 @@ pub fn run() -> ExitCode {
     }
 }
 
-/// Safety net for exits that bypass Quit (spec §8), for example ⌘Q in a window.
+/// Safety net for event-loop exits that bypass Quit (spec §8), e.g. an event-loop error.
 fn select_fallback_on_exit(paths: &Paths) {
-    let config = companion_core::config::load(&paths.config_file).config;
+    let config = load_config_logged(&paths.config_file);
     if let Some(id) = config.fallback {
         match input_source::system_backend().select(&id) {
             Ok(()) => tracing::info!(id, "selected the fallback input source on exit"),
@@ -72,4 +74,14 @@ fn select_fallback_on_exit(paths: &Paths) {
             }
         }
     }
+}
+
+/// Loads the settings and logs each warning. A hand-edited file may be moved aside as
+/// `config.toml.bad-<secs>` by this load, and the warning is the only record of it.
+pub fn load_config_logged(path: &Path) -> companion_core::Config {
+    let loaded = companion_core::config::load(path);
+    for warning in &loaded.warnings {
+        tracing::warn!("{warning}");
+    }
+    loaded.config
 }

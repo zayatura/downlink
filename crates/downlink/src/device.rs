@@ -21,6 +21,12 @@ pub enum DeviceMessage {
     Event(DeviceEvent),
 }
 
+/// Whether the app may log this event. Key presses never are, at any level: a debug log would
+/// otherwise be a keystroke log.
+pub fn loggable(event: &DeviceEvent) -> bool {
+    !matches!(event, DeviceEvent::KeyDown(_) | DeviceEvent::KeyUp(_))
+}
+
 pub fn events() -> impl Stream<Item = DeviceMessage> {
     iced::stream::channel(64, async |mut output: async_mpsc::Sender<DeviceMessage>| {
         let (command_tx, command_rx) = mpsc::channel();
@@ -52,4 +58,43 @@ pub fn events() -> impl Stream<Item = DeviceMessage> {
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use oryx_device::DeviceEvent;
+    use oryx_protocol::{MatrixPos, Model};
+
+    use super::loggable;
+
+    #[test]
+    fn key_events_are_never_logged() {
+        let pos = MatrixPos { row: 1, col: 2 };
+        assert!(!loggable(&DeviceEvent::KeyDown(pos)));
+        assert!(!loggable(&DeviceEvent::KeyUp(pos)));
+    }
+
+    #[test]
+    fn connection_and_layer_events_are_logged() {
+        let events = [
+            DeviceEvent::Connected {
+                model: Model::Voyager,
+                ids: None,
+                protocol: None,
+            },
+            DeviceEvent::Layer(1),
+            DeviceEvent::Disconnected {
+                reason: "unplugged".into(),
+            },
+            DeviceEvent::Unsupported {
+                reason: "no pairing".into(),
+            },
+            DeviceEvent::OpenFailed {
+                reason: "busy".into(),
+            },
+        ];
+        for event in events {
+            assert!(loggable(&event), "{event:?}");
+        }
+    }
 }

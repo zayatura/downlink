@@ -1,7 +1,6 @@
 //! Application state, messages and the effect executor.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -14,6 +13,7 @@ use oryx_layout::client::{self, HttpClient};
 use oryx_protocol::{LayoutIds, Model};
 
 use crate::device::{self, DeviceHandle, DeviceMessage};
+use crate::layout_fetch::{FetchOutcome, resolve_fetch};
 use crate::paths::Paths;
 use crate::source_choice::SourceChoice;
 use crate::tray::{self, AppMenu, MenuAction, Tray};
@@ -72,10 +72,7 @@ pub struct App {
 
 impl App {
     pub fn boot(paths: Paths) -> (App, Task<Message>) {
-        let loaded = config::load(&paths.config_file);
-        for warning in &loaded.warnings {
-            tracing::warn!("{warning}");
-        }
+        let config = crate::load_config_logged(&paths.config_file);
         let http = match client::client_builder(env!("CARGO_PKG_VERSION")).build() {
             Ok(http) => Some(http),
             Err(error) => {
@@ -84,7 +81,7 @@ impl App {
             }
         };
         let app = App {
-            engine: Engine::new(loaded.config),
+            engine: Engine::new(config),
             cache: LayoutCache::new(paths.layout_cache_dir()),
             paths,
             sources: Vec::new(),
@@ -168,7 +165,9 @@ impl App {
                 Task::none()
             }
             Message::Device(DeviceMessage::Event(event)) => {
-                tracing::debug!(?event, "device");
+                if device::loggable(&event) {
+                    tracing::debug!(?event, "device");
+                }
                 self.dispatch(Input::Device(event))
             }
             Message::Menu(id) => self.on_menu(&id),
@@ -444,35 +443,31 @@ impl App {
         from_cache: bool,
         result: Result<String, String>,
     ) -> Task<Message> {
-        let parsed = match result {
-            Ok(json) => match oryx_layout::parse_graphql(&json) {
-                Ok(layout) => {
-                    if !from_cache && let Err(error) = self.cache.store(&ids, &json) {
-                        tracing::warn!(%error, "could not cache the layout");
-                    }
-                    Ok(Arc::new(layout))
+        let parsed = match resolve_fetch(result, from_cache, || self.cache.load(&ids)) {
+            FetchOutcome::Use {
+                layout,
+                store_json,
+                fallback,
+            } => {
+                if let Some(json) = store_json
+                    && let Err(error) = self.cache.store(&ids, &json)
+                {
+                    tracing::warn!(%error, "could not cache the layout");
                 }
-                Err(error) if from_cache => {
-                    tracing::warn!(%error, "the cached layout is unreadable; fetching it again");
-                    return self.fetch_layout(model, ids, true);
+                if let Some(reason) = fallback {
+                    tracing::info!(%reason, "using the cached layout");
                 }
-                Err(error) => Err(error.to_string()),
-            },
-            Err(network) => match self
-                .cache
-                .load(&ids)
-                .map(|json| oryx_layout::parse_graphql(&json))
-            {
-                Some(Ok(layout)) => {
-                    tracing::info!(%network, "using the cached layout");
-                    Ok(Arc::new(layout))
-                }
-                _ => Err(network),
-            },
+                Ok(layout)
+            }
+            FetchOutcome::Refetch => {
+                tracing::warn!("the cached layout is unreadable; fetching it again");
+                return self.fetch_layout(model, ids, true);
+            }
+            FetchOutcome::Fail(error) => {
+                tracing::warn!(%error, "layout unavailable");
+                Err(error)
+            }
         };
-        if let Err(error) = &parsed {
-            tracing::warn!(%error, "layout unavailable");
-        }
         self.dispatch(Input::LayoutLoaded {
             ids,
             result: parsed,

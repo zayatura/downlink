@@ -19,3 +19,6 @@ hidapi = { version = "2.6", features = ["macos-shared-device"], optional = true 
 [[example]]
 name = "watch"
 required-features = ["hid"]
+
+[dev-dependencies]
+tracing-subscriber = "0.3"

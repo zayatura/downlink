@@ -3105,6 +3105,7 @@ dependencies = [
  "hidapi",
  "oryx-protocol",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

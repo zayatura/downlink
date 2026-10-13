@@ -100,6 +100,8 @@ impl Session {
                 tracing::warn!(code, "keyboard reported an error");
                 Vec::new()
             }
+            // Key positions are never logged, at any level: a debug log would be a keystroke log.
+            Event::KeyDown(_) | Event::KeyUp(_) => Vec::new(),
             other => {
                 tracing::debug!(?other, "ignoring event");
                 Vec::new()
