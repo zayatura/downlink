@@ -14,6 +14,7 @@ Record pass/fail and the date for each item.
 - [ ] Appearance "System" follows macOS Light/Dark live; Light and Dark force a palette.
 - [ ] Launch at login: enable, log out and back in (or reboot), Downlink is running.
 - [ ] ⌘W and ⌘Q in the Layout and Settings windows close the window only; the icon stays and switching continues.
+- [ ] Minimize the layout window (⌘M), then choose Show Layout from the menu bar: the window comes back and takes focus.
 - [ ] A second launch exits immediately ("already running" in the log).
 - [ ] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.
 - [ ] Logs in `~/Library/Logs/Downlink/` have no ERROR lines during the above.

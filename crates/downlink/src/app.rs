@@ -302,7 +302,8 @@ impl App {
     fn open_window(&mut self, kind: WindowKind) -> Task<Message> {
         if let Some((&id, _)) = self.windows.iter().find(|(_, k)| **k == kind) {
             platform::activate_app();
-            return window::gain_focus(id);
+            // winit ignores a focus request while the window is minimized, so restore it first.
+            return window::minimize(id, false).chain(window::gain_focus(id));
         }
         let settings = match kind {
             WindowKind::Layout => window::Settings {
