@@ -34,7 +34,7 @@ open /Applications/Downlink.app
 The Downlink key icon appears in the menu bar. Its menu shows the connection, the active layer and
 the input source:
 
-<img alt="The Downlink menu-bar menu: Voyager connected, the active layer and input source, Show Layout, Settings, Pause Input Switching and Quit" src="docs/images/menu.png" width="378">
+<img alt="The Downlink menu open under its menu-bar icon: Voyager connected, the active layer and input source, Show Layout, Settings, Pause Input Switching and Quit" src="docs/images/menu.png" width="345">
 
 Open **Settings…** to choose an input source for each layer and the fallback used when the keyboard
 disconnects or Downlink quits. Turn on **Launch at login** there, too.
