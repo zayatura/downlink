@@ -17,6 +17,7 @@ core-foundation-sys = "0.8"
 [target.'cfg(target_os = "linux")'.dependencies]
 serde.workspace = true
 serde_json.workspace = true
+xkbcommon = { version = "0.9", default-features = false }
 
 [dev-dependencies]
 tempfile.workspace = true
