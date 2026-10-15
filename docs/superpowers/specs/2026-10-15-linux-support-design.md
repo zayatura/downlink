@@ -69,9 +69,9 @@ platform modules. The tray becomes a third such seam.
 | Unit | Change |
 |------|--------|
 | `input-source` | New `hyprland` module, `cfg(target_os = "linux")`. `system_backend()` returns it on Linux. `UnsupportedBackend` stays for other OSes. |
-| `downlink/src/tray/` | `tray.rs` becomes `tray/mod.rs` (shared: menu IDs, `MenuAction`, `menu_action`, the menu-event channel, a `Tray` type with `new()` and `apply(&TrayView)`), `tray/muda.rs` (macOS: today's `tray-icon`/`muda` code and `AppMenu`) and `tray/ksni.rs` (Linux). `App` uses `Tray` as today. |
-| `downlink/src/platform/` | `other.rs` becomes `linux.rs` (autostart, plus the no-op `hide_dock_icon`, `activate_app` and `system_mode`). `launch_agent.rs` becomes macOS-only. New `autostart.rs` holds the pure `.desktop` logic and builds on every OS. |
-| `downlink/src/app.rs` | `AppMenu` is installed only on macOS. Windows set the Wayland `app_id` `downlink`. |
+| `downlink/src/tray/` | `tray.rs` becomes `tray/mod.rs` (shared: menu IDs, `MenuAction`, `menu_action`, the menu-event channel), `tray/menu_model.rs` (the menu as data, built from `TrayView`), `tray/macos.rs` (today's `tray-icon`/`muda` code and `AppMenu`) and `tray/linux.rs` (`ksni`, and an `AppMenu` that does nothing). Both export `Tray` with `new()` and `apply(&TrayView, dark: bool)`. `App` uses them without `cfg`. |
+| `downlink/src/platform/` | `other.rs` becomes `linux.rs` (autostart, plus the no-op `hide_dock_icon`, `activate_app` and `system_mode`). New `autostart.rs` holds the pure `.desktop` logic. Both it and `launch_agent.rs` are pure and build on every OS. A new `window_platform_specific()` gives each OS its iced window settings. |
+| `downlink/src/app.rs` | Passes the effective appearance to the tray and refreshes it when the system appearance changes. Windows take `platform::window_platform_specific()`, which sets the Wayland `app_id` `downlink` on Linux. |
 | `oryx-device` | `describe_open_error` recognises a permission error (§8.3). Nothing else is expected to change. |
 | `oryx-protocol`, `oryx-layout`, `companion-core` | No changes. |
 | `packaging/linux/` | `50-zsa.rules`, `downlink.desktop` (launcher entry), `install.sh`. |
@@ -79,7 +79,10 @@ platform modules. The tray becomes a third such seam.
 
 New Linux-only dependencies:
 
-- `ksni`, with its `blocking` API: the StatusNotifierItem tray, pure Rust over D-Bus, no GTK.
+- `ksni`, with its `blocking` API on the `async-io` backend (`default-features = false`): the
+  StatusNotifierItem tray, pure Rust over D-Bus, no GTK. The default `tokio` backend can't be
+  used: its blocking calls start a tokio runtime, and iced runs `update` inside its own tokio
+  runtime, so tokio would panic ("Cannot start a runtime from within a runtime").
 - `xkbcommon`: layout display names, linking the system libxkbcommon.
 - `serde_json`, already a workspace dependency, parses Hyprland's replies. The socket uses only `std`.
 
@@ -136,10 +139,13 @@ up by position.
 
 ## 7. The tray (`ksni`)
 
-- **State.** `DownlinkTray` holds the status text, the detail text, `paused`, `connected` and the
-  icon colour. It implements `ksni::Tray`. `Tray::new()` spawns it with the blocking API, which runs
-  the D-Bus service on its own thread. `Tray::apply(&TrayView)` calls `handle.update(…)` only when
-  something changed.
+- **State.** `DownlinkTray` holds the `TrayView` and whether the effective appearance is dark. It
+  implements `ksni::Tray`. `Tray::new()` spawns it with the blocking API, which runs the D-Bus
+  service on its own thread. `Tray::apply(&TrayView, dark)` calls `handle.update(…)` only when
+  something changed. iced reports system appearance changes on Linux even with no window open,
+  so the icon follows the appearance at all times.
+- **Labels.** DBusMenu treats `_` as a mnemonic marker, so status and detail text (which can hold a
+  layer title) double every `_`.
 - **Menu.** It matches macOS:
   - the status row and the detail row, both disabled
   - separator
@@ -158,9 +164,11 @@ up by position.
   22 px and 44 px in a solid foreground colour: light when the effective appearance is dark, dark
   when it is light. The connected and disconnected variants come from the existing
   `menubar_rgba(px, connected)`. The icon is redrawn when the appearance or the connection changes.
-- **Resilience.** If no StatusNotifierWatcher exists at startup, the error is logged and Downlink
-  runs without a tray, as on macOS when the tray fails. `watcher_offline` returns `true`, so the
-  item registers again when the bar restarts.
+- **Resilience.** The tray is spawned with `assume_sni_available(true)`. If no
+  StatusNotifierWatcher exists yet, for example when autostart beats the bar at login, the item
+  registers as soon as one appears. `watcher_offline` logs and returns `true`, so the item
+  registers again when the bar restarts. Any other spawn error is logged, and Downlink runs
+  without a tray, as on macOS when the tray fails.
 
 ## 8. Platform glue
 
@@ -183,8 +191,9 @@ up by position.
 2. Install the binary to `~/.local/bin/downlink`.
 3. Render PNG icons with the existing `make-icons` bin into
    `~/.local/share/icons/hicolor/<size>x<size>/apps/downlink.png`.
-4. Install `packaging/linux/downlink.desktop` (the launcher entry, `Exec=downlink`) to
-   `~/.local/share/applications/`.
+4. Install `packaging/linux/downlink.desktop` (the launcher entry) to
+   `~/.local/share/applications/`, with `Exec=` set to the installed binary's absolute path, so the
+   entry works even when `~/.local/bin` isn't on the launcher's `PATH`.
 
 Windows set the Wayland `app_id` `downlink` through iced's `platform_specific.application_id`, so
 Hyprland and the launcher match them to that entry and its icon.
