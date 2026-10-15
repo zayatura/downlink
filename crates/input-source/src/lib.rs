@@ -1,6 +1,8 @@
 //! The OS keyboard input source (macOS: Text Input Sources).
 
 mod fake;
+#[cfg(target_os = "linux")]
+pub mod hyprland;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(not(target_os = "macos"))]
