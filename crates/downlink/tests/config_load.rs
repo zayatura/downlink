@@ -1,7 +1,16 @@
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use tracing_subscriber::fmt::MakeWriter;
+
+/// tracing caches each call site's interest globally. While one test captures logs with a
+/// scoped subscriber, another test hitting the same call site on another thread can race that
+/// cache and silence the capture, so the tests here that log run one at a time.
+static TRACING: Mutex<()> = Mutex::new(());
+
+fn serial() -> MutexGuard<'static, ()> {
+    TRACING.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 #[derive(Clone, Default)]
 struct Captured(Arc<Mutex<Vec<u8>>>);
@@ -25,6 +34,7 @@ impl<'a> MakeWriter<'a> for Captured {
 
 #[test]
 fn every_config_warning_is_logged_and_the_valid_parts_are_kept() {
+    let _serial = serial();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.toml");
     std::fs::write(
@@ -55,6 +65,7 @@ fn every_config_warning_is_logged_and_the_valid_parts_are_kept() {
 
 #[test]
 fn a_corrupt_file_is_moved_aside_and_the_warning_is_logged() {
+    let _serial = serial();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.toml");
     std::fs::write(&path, "this is = = not toml").unwrap();
@@ -78,6 +89,7 @@ fn a_corrupt_file_is_moved_aside_and_the_warning_is_logged() {
 
 #[test]
 fn first_run_writes_the_defaults() {
+    let _serial = serial();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("nested/config.toml");
 
@@ -92,6 +104,7 @@ fn first_run_writes_the_defaults() {
 
 #[test]
 fn an_existing_file_is_not_rewritten() {
+    let _serial = serial();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.toml");
     let text = "# my notes\n[switching]\nfallback = \"com.example.en\"\n";
@@ -105,6 +118,7 @@ fn an_existing_file_is_not_rewritten() {
 
 #[test]
 fn a_corrupt_file_is_moved_aside_and_not_replaced() {
+    let _serial = serial();
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.toml");
     std::fs::write(&path, "this is = = not toml").unwrap();
