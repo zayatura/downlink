@@ -1,6 +1,6 @@
 //! Turns key actions into short display legends.
 
-use crate::{Action, Key, Modifiers};
+use crate::{Action, Key, Layout, Modifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModifierStyle {
@@ -15,7 +15,7 @@ pub enum LegendKind {
     Normal,
     /// The tap action switches layers; drawn with the accent border.
     Layer,
-    /// Falls through to the layer below.
+    /// Falls through to the layer below; has no legend of its own.
     Transparent,
     /// Does nothing (`KC_NO`).
     Blank,
@@ -26,6 +26,8 @@ pub struct KeyLegend {
     pub tap: String,
     pub hold: Option<String>,
     pub kind: LegendKind,
+    /// Borrowed from a layer beneath, because the shown layer leaves the key transparent.
+    pub inherited: bool,
 }
 
 const LAYER_CODES: [&str; 7] = ["TO", "DF", "TG", "OSL", "MO", "TT", "LM"];
@@ -33,9 +35,10 @@ const LAYER_CODES: [&str; 7] = ["TO", "DF", "TG", "OSL", "MO", "TT", "LM"];
 pub fn key_legend(key: &Key, layer_titles: &[String], style: ModifierStyle) -> KeyLegend {
     if key.is_transparent() {
         return KeyLegend {
-            tap: "▽".into(),
+            tap: String::new(),
             hold: None,
             kind: LegendKind::Transparent,
+            inherited: false,
         };
     }
     let hold = key
@@ -59,7 +62,42 @@ pub fn key_legend(key: &Key, layer_titles: &[String], style: ModifierStyle) -> K
     } else {
         kind
     };
-    KeyLegend { tap, hold, kind }
+    KeyLegend {
+        tap,
+        hold,
+        kind,
+        inherited: false,
+    }
+}
+
+/// The legends for every key of layer `shown`, with `below` (highest first) the active layers
+/// its transparent keys fall through to. A key no layer sets is blank. Empty if `shown` is not
+/// in the layout.
+pub fn layer_legends(
+    layout: &Layout,
+    shown: u8,
+    below: &[u8],
+    style: ModifierStyle,
+) -> Vec<KeyLegend> {
+    let Some(layer) = layout.layer(shown) else {
+        return Vec::new();
+    };
+    let titles: Vec<String> = layout.layers.iter().map(|l| l.title.clone()).collect();
+    let order = || std::iter::once(shown).chain(below.iter().copied());
+    (0..layer.keys.len())
+        .map(|index| match layout.resolve_key(order(), index) {
+            Some((from, key)) => KeyLegend {
+                inherited: from != shown,
+                ..key_legend(key, &titles, style)
+            },
+            None => KeyLegend {
+                tap: String::new(),
+                hold: None,
+                kind: LegendKind::Blank,
+                inherited: false,
+            },
+        })
+        .collect()
 }
 
 fn is_layer_action(action: &Action) -> bool {
@@ -153,7 +191,7 @@ fn sym(style: ModifierStyle, symbol: &'static str, word: &'static str) -> &'stat
 fn builtin(code: &str, style: ModifierStyle) -> Option<&'static str> {
     Some(match code {
         "KC_NO" => "",
-        "KC_TRANSPARENT" | "KC_TRNS" => "▽",
+        "KC_TRANSPARENT" | "KC_TRNS" => "",
         "KC_ENTER" | "KC_ENT" | "KC_KP_ENTER" => "Enter",
         "KC_ESCAPE" | "KC_ESC" => "Esc",
         "KC_BSPC" | "KC_BACKSPACE" => "Bksp",

@@ -1,5 +1,7 @@
-use oryx_layout::labels::{KeyLegend, LegendKind, ModifierStyle, code_label, key_legend};
-use oryx_layout::{Action, Key, Modifiers};
+use oryx_layout::labels::{
+    KeyLegend, LegendKind, ModifierStyle, code_label, key_legend, layer_legends,
+};
+use oryx_layout::{Action, Key, Layer, Layout, Modifiers};
 
 fn act(code: &str) -> Option<Action> {
     Some(Action {
@@ -26,15 +28,26 @@ fn legend(key: Key) -> KeyLegend {
 }
 
 #[test]
-fn transparent_keys_show_a_marker() {
+fn transparent_keys_have_no_legend_of_their_own() {
     assert_eq!(
         legend(Key::default()),
         KeyLegend {
-            tap: "▽".into(),
+            tap: String::new(),
             hold: None,
-            kind: LegendKind::Transparent
+            kind: LegendKind::Transparent,
+            inherited: false,
         }
     );
+}
+
+#[test]
+fn an_explicit_kc_transparent_is_transparent() {
+    let key = Key {
+        tap: act("KC_TRANSPARENT"),
+        ..Key::default()
+    };
+    assert!(key.is_transparent());
+    assert_eq!(legend(key).kind, LegendKind::Transparent);
 }
 
 #[test]
@@ -109,7 +122,8 @@ fn layer_tap_shows_tap_and_target_layer_title() {
         KeyLegend {
             tap: "Space".into(),
             hold: Some("Navig".into()),
-            kind: LegendKind::Normal
+            kind: LegendKind::Normal,
+            inherited: false,
         }
     );
 }
@@ -134,7 +148,8 @@ fn layer_switch_keys_are_marked_and_named() {
         KeyLegend {
             tap: "→ HU".into(),
             hold: None,
-            kind: LegendKind::Layer
+            kind: LegendKind::Layer,
+            inherited: false,
         }
     );
     assert_eq!(
@@ -204,4 +219,77 @@ fn wrapped_modifiers_prefix_the_label() {
         key_legend(&key, &titles(), ModifierStyle::Words).tap,
         "Alt+Shift+F"
     );
+}
+
+fn layer(index: u8, keys: Vec<Key>) -> Layer {
+    Layer {
+        index,
+        title: titles()[usize::from(index)].clone(),
+        keys,
+    }
+}
+
+fn tap(code: &str) -> Key {
+    Key {
+        tap: act(code),
+        ..Key::default()
+    }
+}
+
+/// Key 0 is set on HU, key 1 only on RO and Main, key 2 only on Main, key 3 nowhere.
+fn stacked_layout() -> Layout {
+    let none = Key::default;
+    Layout {
+        title: "Test".into(),
+        layout_id: "abc12".into(),
+        revision_id: "rev99".into(),
+        geometry: "voyager".into(),
+        layers: vec![
+            layer(0, vec![tap("KC_Q"), tap("KC_W"), tap("KC_E"), none()]),
+            layer(1, vec![none(), tap("KC_S"), none(), none()]),
+            layer(2, vec![tap("KC_Z"), none(), none(), none()]),
+        ],
+    }
+}
+
+#[test]
+fn transparent_keys_take_the_legend_of_the_first_layer_beneath_that_sets_them() {
+    let legends = layer_legends(&stacked_layout(), 2, &[1, 0], ModifierStyle::Symbols);
+    let taps: Vec<(&str, bool)> = legends
+        .iter()
+        .map(|l| (l.tap.as_str(), l.inherited))
+        .collect();
+    assert_eq!(
+        taps,
+        vec![("Z", false), ("S", true), ("E", true), ("", false)]
+    );
+}
+
+#[test]
+fn layers_that_are_off_are_skipped() {
+    let legends = layer_legends(&stacked_layout(), 2, &[0], ModifierStyle::Symbols);
+    assert_eq!(legends[1].tap, "W");
+    assert!(legends[1].inherited);
+}
+
+#[test]
+fn a_key_no_layer_sets_is_blank() {
+    let legends = layer_legends(&stacked_layout(), 0, &[], ModifierStyle::Symbols);
+    assert_eq!(legends[3].kind, LegendKind::Blank);
+    assert_eq!(legends[3].tap, "");
+    assert!(!legends[3].inherited);
+}
+
+#[test]
+fn an_unknown_layer_has_no_legends() {
+    assert!(layer_legends(&stacked_layout(), 7, &[0], ModifierStyle::Symbols).is_empty());
+}
+
+#[test]
+fn resolve_key_reports_the_layer_the_key_comes_from() {
+    let layout = stacked_layout();
+    let (from, key) = layout.resolve_key([2, 1, 0], 1).unwrap();
+    assert_eq!(from, 1);
+    assert_eq!(key.tap.as_ref().unwrap().code, "KC_S");
+    assert!(layout.resolve_key([2, 1, 0], 3).is_none());
 }

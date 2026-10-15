@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use companion_core::{Config, Engine, Input, TrayView};
 use oryx_device::DeviceEvent;
-use oryx_layout::{Key, Layer, Layout};
+use oryx_layout::{Action, Key, Layer, Layout, Modifiers};
 use oryx_protocol::{LayoutIds, MatrixPos, Model};
 
 fn ids() -> LayoutIds {
@@ -22,7 +22,18 @@ fn connected_engine() -> Engine {
 }
 
 fn with_layout(e: &mut Engine, titles: &[&str]) {
-    let layout = Layout {
+    load(e, test_layout(titles));
+}
+
+fn load(e: &mut Engine, layout: Layout) {
+    e.handle(Input::LayoutLoaded {
+        ids: ids(),
+        result: Ok(Arc::new(layout)),
+    });
+}
+
+fn test_layout(titles: &[&str]) -> Layout {
+    Layout {
         title: "Test".into(),
         layout_id: "abc12".into(),
         revision_id: "rev99".into(),
@@ -36,11 +47,7 @@ fn with_layout(e: &mut Engine, titles: &[&str]) {
                 keys: vec![Key::default(); 52],
             })
             .collect(),
-    };
-    e.handle(Input::LayoutLoaded {
-        ids: ids(),
-        result: Ok(Arc::new(layout)),
-    });
+    }
 }
 
 fn down(row: u8, col: u8) -> Input {
@@ -188,4 +195,72 @@ fn tray_view_reports_failures() {
         e.tray_view(|_| None).status,
         "Firmware doesn't report live data"
     );
+}
+
+fn layer(index: u8) -> Input {
+    Input::Device(DeviceEvent::Layer(index))
+}
+
+/// Layers 0–7; the key at matrix (0, 1), Oryx index 0, moves Main → RO and RO → HU.
+fn with_move_keys(e: &mut Engine) {
+    let mut layout = test_layout(&[
+        "Main", "RO", "HU", "Navig", "Num", "Sym R", "Sym L", "Mouse",
+    ]);
+    let move_to = |layer| Key {
+        tap: Some(Action {
+            code: "TO".into(),
+            layer: Some(layer),
+            modifiers: Modifiers::default(),
+        }),
+        ..Key::default()
+    };
+    layout.layers[0].keys[0] = move_to(1);
+    layout.layers[1].keys[0] = move_to(2);
+    load(e, layout);
+}
+
+#[test]
+fn a_momentary_layer_falls_through_to_the_moved_to_layer() {
+    let mut e = connected_engine();
+    with_move_keys(&mut e);
+    e.handle(layer(0));
+    e.handle(down(0, 1));
+    e.handle(layer(1));
+    e.handle(up(0, 1));
+    e.handle(layer(6));
+    assert_eq!(e.layers_below(6), vec![1, 0]);
+    e.handle(layer(1));
+    assert_eq!(e.layers_below(1), vec![0]);
+}
+
+#[test]
+fn moving_on_from_a_moved_to_layer_leaves_only_the_new_one() {
+    let mut e = connected_engine();
+    with_move_keys(&mut e);
+    e.handle(down(0, 1));
+    e.handle(layer(1));
+    e.handle(up(0, 1));
+    e.handle(down(0, 1)); // now RO's key: → HU
+    e.handle(layer(2));
+    e.handle(up(0, 1));
+    e.handle(layer(6));
+    assert_eq!(e.layers_below(6), vec![2, 0]);
+}
+
+#[test]
+fn reconnecting_forgets_the_layer_stack() {
+    let mut e = connected_engine();
+    with_move_keys(&mut e);
+    e.handle(down(0, 1));
+    e.handle(layer(1));
+    e.handle(Input::Device(DeviceEvent::Disconnected {
+        reason: "unplugged".into(),
+    }));
+    e.handle(Input::Device(DeviceEvent::Connected {
+        model: Model::Voyager,
+        ids: Some(ids()),
+        protocol: Some(5),
+    }));
+    e.handle(layer(6));
+    assert_eq!(e.layers_below(6), vec![0]);
 }

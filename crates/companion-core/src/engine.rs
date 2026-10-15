@@ -9,6 +9,7 @@ use oryx_layout::{Layout, geometry};
 use oryx_protocol::{LayoutIds, Model};
 
 use crate::config::Config;
+use crate::layer_stack::LayerStack;
 
 /// How long to wait before retrying the first failed layout fetch (spec §6.2).
 pub const FIRST_LAYOUT_RETRY: Duration = Duration::from_secs(30);
@@ -77,6 +78,8 @@ pub struct Engine {
     config: Config,
     connection: Connection,
     layer: Option<u8>,
+    /// Every active layer, rebuilt from the layer reports and key presses.
+    stack: LayerStack,
     /// Last source *Downlink* selected (spec §6.4 rule 5).
     last_selected: Option<String>,
     paused: bool,
@@ -97,6 +100,7 @@ impl Engine {
             config,
             connection: Connection::Searching,
             layer: None,
+            stack: LayerStack::default(),
             last_selected: None,
             paused: false,
             layout: LayoutState::None,
@@ -134,6 +138,11 @@ impl Engine {
 
     pub fn pressed(&self) -> &BTreeSet<usize> {
         &self.pressed
+    }
+
+    /// The active layers beneath `layer`, highest first: where its transparent keys fall through.
+    pub fn layers_below(&self, layer: u8) -> Vec<u8> {
+        self.stack.below(layer)
     }
 
     /// The layer the layout window shows: the pinned preview, else the live layer.
@@ -233,6 +242,7 @@ impl Engine {
                 protocol,
             } => self.on_connected(model, ids, protocol),
             DeviceEvent::Layer(layer) => {
+                self.stack.layer_reported(layer);
                 if self.layer == Some(layer) {
                     return Vec::new();
                 }
@@ -242,7 +252,10 @@ impl Engine {
                 effects
             }
             DeviceEvent::KeyDown(pos) => {
-                if let Some(index) = self.key_index(pos) {
+                let index = self.key_index(pos);
+                let key = index.and_then(|index| self.key_on_stack(index)).cloned();
+                self.stack.key_pressed(key.as_ref());
+                if let Some(index) = index {
                     self.pressed.insert(index);
                 }
                 Vec::new()
@@ -266,6 +279,16 @@ impl Engine {
         }
     }
 
+    /// What the key at Oryx `index` does on the current layer stack.
+    fn key_on_stack(&self, index: usize) -> Option<&oryx_layout::Key> {
+        let LayoutState::Ready(layout) = &self.layout else {
+            return None;
+        };
+        let top = self.stack.top();
+        let layers = std::iter::once(top).chain(self.stack.below(top));
+        layout.resolve_key(layers, index).map(|(_, key)| key)
+    }
+
     fn key_index(&self, pos: oryx_protocol::MatrixPos) -> Option<usize> {
         match &self.connection {
             Connection::Connected { model, .. } => geometry::oryx_index(*model, pos),
@@ -285,6 +308,7 @@ impl Engine {
             protocol,
         };
         self.layer = None;
+        self.stack.reset();
         self.pressed.clear();
         self.reset_layout_retry();
         let mut effects = vec![Effect::RefreshTray];
@@ -318,6 +342,7 @@ impl Engine {
         let changed = self.connection != next;
         self.connection = next;
         self.layer = None;
+        self.stack.reset();
         self.pressed.clear();
         self.reset_layout_retry();
         let mut effects = if changed {
