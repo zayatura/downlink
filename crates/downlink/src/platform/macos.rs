@@ -1,7 +1,10 @@
 use std::{fs, io};
 
 use objc2::MainThreadMarker;
-use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+use objc2_app_kit::{
+    NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSApplicationActivationPolicy,
+};
+use objc2_foundation::NSArray;
 
 use super::launch_agent;
 
@@ -66,14 +69,18 @@ pub fn refresh_launch_at_login() -> Result<bool, String> {
     Ok(true)
 }
 
-/// The current macOS appearance. iced can't tell before a window exists (Phase 0).
+/// The current macOS appearance, `Mode::None` off the main thread. iced only learns of a change
+/// through a window whose appearance it hasn't pinned yet, so Downlink asks AppKit directly: at
+/// startup, when it opens a window, and on every poll while one is open.
 pub fn system_mode() -> iced::theme::Mode {
-    let output = std::process::Command::new("/usr/bin/defaults")
-        .args(["read", "-g", "AppleInterfaceStyle"])
-        .output();
-    let style = match &output {
-        Ok(out) if out.status.success() => Some(String::from_utf8_lossy(&out.stdout).into_owned()),
-        _ => None, // the key is absent in light mode
+    let Some(mtm) = MainThreadMarker::new() else {
+        return iced::theme::Mode::None;
     };
-    super::appearance_from_interface_style(style.as_deref())
+    let appearance = NSApplication::sharedApplication(mtm).effectiveAppearance();
+    // SAFETY: AppKit's appearance-name constants are immutable statics.
+    let (aqua, dark) = unsafe { (NSAppearanceNameAqua, NSAppearanceNameDarkAqua) };
+    match appearance.bestMatchFromAppearancesWithNames(&NSArray::from_slice(&[aqua, dark])) {
+        Some(name) if &*name == dark => iced::theme::Mode::Dark,
+        _ => iced::theme::Mode::Light,
+    }
 }

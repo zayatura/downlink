@@ -180,6 +180,8 @@ impl App {
             Message::Menu(id) => self.on_menu(&id),
             Message::SystemTheme(mode) => {
                 // iced reports `None` before any window exists (Phase 0); keep the seeded mode then.
+                // It also stops reporting changes once it pins a window's appearance, so the poll
+                // re-seeds the mode too.
                 if mode != Mode::None {
                     self.system_mode = mode;
                 }
@@ -202,6 +204,8 @@ impl App {
             }
             Message::PollSource => {
                 self.sync_current_source();
+                // iced misses system appearance changes once a window is open.
+                self.seed_system_mode();
                 Task::none()
             }
             Message::LayoutFetched {
