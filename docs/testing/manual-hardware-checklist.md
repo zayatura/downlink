@@ -5,8 +5,12 @@
 Run against the bundled app (`packaging/macos/bundle.sh`, then open `target/bundle/Downlink.app`).
 Record pass/fail and the date for each item.
 
-Last run: 2026-10-13, bundle built from `feat/v1` (a14fa7a; launch at login and offline re-checked
-on the 27b34dc bundle). All items passed.
+Last run: 2026-10-15, bundle built from `feat/linux-support` (d37df54). All items passed, with
+three gaps: sleep and wake ran two cycles, not three; launch at login was checked only by its
+registration (the LaunchAgent is loaded and points at the bundle), the log-out is still to do; and
+the window was minimized with its yellow button, as ⌘M is not bound (nor on `main`). Also checked:
+the keycaps against `docs/images/layout-light.png`, the menu's Pause checkmark and separators, and
+that a second launch without `--show-layout` exits silently and opens no window.
 
 - [x] Cold start with the keyboard plugged in: connected within 2 s, no Dock icon.
 - [x] Plug the keyboard in after start: connects within 2 s.
