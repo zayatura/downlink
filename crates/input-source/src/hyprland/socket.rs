@@ -16,9 +16,9 @@ fn platform(error: impl std::fmt::Display) -> InputSourceError {
     InputSourceError::Platform(format!("Hyprland IPC: {error}"))
 }
 
-/// The instance named by `signature` if its socket exists; otherwise the one instance under
-/// `<runtime_dir>/hypr/` whose socket is `alive`. A shell started before a Hyprland restart
-/// still names the old instance.
+/// The instance named by `signature` if its socket is `alive`; otherwise the one instance under
+/// `<runtime_dir>/hypr/` whose socket is. A shell started before a Hyprland restart still names
+/// the old instance, and a crashed one can leave its socket file behind.
 pub fn resolve_socket(
     runtime_dir: &Path,
     signature: Option<&str>,
@@ -27,7 +27,7 @@ pub fn resolve_socket(
     let hypr = runtime_dir.join("hypr");
     if let Some(signature) = signature.filter(|s| !s.is_empty()) {
         let socket = hypr.join(signature).join(SOCKET_NAME);
-        if socket.exists() {
+        if alive(&socket) {
             return Ok(socket);
         }
     }

@@ -26,7 +26,7 @@ fn the_signature_from_the_environment_wins() {
     let wanted = instance(runtime.path(), "abc_1");
     instance(runtime.path(), "def_2");
     assert_eq!(
-        resolve_socket(runtime.path(), Some("abc_1"), never_alive).unwrap(),
+        resolve_socket(runtime.path(), Some("abc_1"), |_| true).unwrap(),
         wanted
     );
 }
@@ -97,4 +97,16 @@ fn a_request_to_a_missing_socket_is_a_platform_error() {
         request(&dir.path().join(".socket.sock"), "j/devices"),
         Err(InputSourceError::Platform(_))
     ));
+}
+
+#[test]
+fn a_crashed_instance_whose_socket_file_remains_falls_back_too() {
+    let runtime = tempfile::tempdir().unwrap();
+    instance(runtime.path(), "crashed_1");
+    let live = instance(runtime.path(), "live_2");
+    let alive = |p: &Path| p.starts_with(runtime.path().join("hypr/live_2"));
+    assert_eq!(
+        resolve_socket(runtime.path(), Some("crashed_1"), alive).unwrap(),
+        live
+    );
 }
