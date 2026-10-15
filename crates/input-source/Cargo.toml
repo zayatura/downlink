@@ -17,3 +17,6 @@ core-foundation-sys = "0.8"
 [target.'cfg(target_os = "linux")'.dependencies]
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
