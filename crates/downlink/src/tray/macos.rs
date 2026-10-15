@@ -1,48 +1,16 @@
-//! The menu-bar item (spec §6.1).
-
-use std::sync::{Mutex, OnceLock, PoisonError};
+//! The menu-bar item and app menu on macOS (spec §6.1): tray-icon and muda.
 
 use companion_core::TrayView;
-use futures::channel::mpsc;
-use futures::{SinkExt, Stream, StreamExt};
 use tray_icon::menu::accelerator::Accelerator;
 use tray_icon::menu::{
     CheckMenuItem, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu,
 };
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
+use super::{
+    APP_SETTINGS, CLOSE_WINDOW, CLOSE_WINDOW_Q, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT, menu_sender,
+};
 use crate::icon;
-
-pub const SHOW_LAYOUT: &str = "show-layout";
-pub const SETTINGS: &str = "settings";
-pub const PAUSE: &str = "pause";
-pub const QUIT: &str = "quit";
-/// App-menu items, active while a Downlink window is focused.
-pub const APP_SETTINGS: &str = "app-settings";
-pub const CLOSE_WINDOW: &str = "app-close-window";
-pub const CLOSE_WINDOW_Q: &str = "app-close-window-q";
-
-/// What a clicked menu item (or its shortcut) asks for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MenuAction {
-    ShowLayout,
-    ShowSettings,
-    TogglePause,
-    Quit,
-    CloseWindow,
-}
-
-/// Only the menu-bar "Quit Downlink" quits; ⌘W and ⌘Q in a window close it (Phase 0, option B).
-pub fn menu_action(id: &str) -> Option<MenuAction> {
-    match id {
-        SHOW_LAYOUT => Some(MenuAction::ShowLayout),
-        SETTINGS | APP_SETTINGS => Some(MenuAction::ShowSettings),
-        PAUSE => Some(MenuAction::TogglePause),
-        QUIT => Some(MenuAction::Quit),
-        CLOSE_WINDOW | CLOSE_WINDOW_Q => Some(MenuAction::CloseWindow),
-        _ => None,
-    }
-}
 
 /// The app's main menu. On macOS it replaces winit's default menu, whose ⌘Q item would call
 /// `NSApp terminate:` and end the process outside Downlink's Quit path. An accessory app never
@@ -76,7 +44,6 @@ impl AppMenu {
             app.append(item).map_err(|e| e.to_string())?;
         }
         menu.append(&app).map_err(|e| e.to_string())?;
-        #[cfg(target_os = "macos")]
         menu.init_for_nsapp();
         Ok(AppMenu { _menu: menu })
     }
@@ -131,7 +98,8 @@ impl Tray {
         })
     }
 
-    pub fn apply(&mut self, view: &TrayView) {
+    /// `_dark` is unused: macOS recolours the template icon for the menu bar itself.
+    pub fn apply(&mut self, view: &TrayView, _dark: bool) {
         self.status.set_text(&view.status);
         self.detail.set_text(if view.detail.is_empty() {
             " "
@@ -162,22 +130,6 @@ fn tray_icon_image(connected: bool) -> Result<Icon, String> {
         .map_err(|e| e.to_string())
 }
 
-/// The process-wide channel that carries clicked menu item IDs from muda's handler to the
-/// `menu_events` stream: the sender, and the receiver until the stream takes it.
-type MenuChannel = (
-    mpsc::UnboundedSender<String>,
-    Mutex<Option<mpsc::UnboundedReceiver<String>>>,
-);
-
-static MENU_CHANNEL: OnceLock<MenuChannel> = OnceLock::new();
-
-fn menu_channel() -> &'static MenuChannel {
-    MENU_CHANNEL.get_or_init(|| {
-        let (tx, rx) = mpsc::unbounded();
-        (tx, Mutex::new(Some(rx)))
-    })
-}
-
 /// Register both event handlers. Call it once, first thing in `App::init`, before any menu or
 /// tray icon exists.
 ///
@@ -189,28 +141,8 @@ fn menu_channel() -> &'static MenuChannel {
 pub fn install_event_handlers() {
     // Downlink doesn't use tray events; the handler only stops them piling up.
     TrayIconEvent::set_event_handler(Some(|_event: TrayIconEvent| {}));
-    let tx = menu_channel().0.clone();
+    let tx = menu_sender().clone();
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         let _ = tx.unbounded_send(event.id.0);
     }));
-}
-
-/// Menu item IDs as they are clicked.
-pub fn menu_events() -> impl Stream<Item = String> {
-    iced::stream::channel(16, async |mut output: mpsc::Sender<String>| {
-        let receiver = menu_channel()
-            .1
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take();
-        let Some(mut rx) = receiver else {
-            tracing::error!("the menu event stream was started twice; menu clicks are not handled");
-            return;
-        };
-        while let Some(id) = rx.next().await {
-            if output.send(id).await.is_err() {
-                break;
-            }
-        }
-    })
 }

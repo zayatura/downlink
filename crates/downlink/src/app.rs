@@ -184,6 +184,8 @@ impl App {
                 // re-seeds the mode too.
                 if mode != Mode::None {
                     self.system_mode = mode;
+                    // The Linux tray icon is drawn for the appearance.
+                    self.refresh_tray();
                 }
                 Task::none()
             }
@@ -409,8 +411,9 @@ impl App {
 
     fn refresh_tray(&mut self) {
         let view = self.engine.tray_view(|id| self.source_name(id));
+        let dark = self.is_dark();
         if let Some(tray) = self.tray.as_mut() {
-            tray.apply(&view);
+            tray.apply(&view, dark);
         }
     }
 
