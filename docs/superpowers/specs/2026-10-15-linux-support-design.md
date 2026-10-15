@@ -96,8 +96,8 @@ Building needs a Rust toolchain installed through `rustup`. The version is pinne
 
 ### 6.1 The IPC client
 
-- **Socket.** Use `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock` if that file
-  exists. Otherwise, use the one instance directory under `$XDG_RUNTIME_DIR/hypr/` that holds a
+- **Socket.** Use `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock` if it accepts
+  a connection (a crashed instance can leave the file behind). Otherwise, use the one instance directory under `$XDG_RUNTIME_DIR/hypr/` that holds a
   `.socket.sock` that accepts a connection. Zero or several candidates give
   `Platform("Hyprland is not running")` or `Platform("several Hyprland instances are running")`.
 - **Requests.** One connection per request: write the command, read the reply to EOF. Downlink
@@ -139,7 +139,9 @@ up by position.
 
 ## 7. The tray (`ksni`)
 
-- **State.** `DownlinkTray` holds the `TrayView` and whether the effective appearance is dark. It
+- **State.** `DownlinkTray` holds the `TrayView` and whether the bar is dark: the system
+  appearance, not Downlink's window override (Appearance Light/Dark), since the bar follows the
+  system; before the system mode is known, the effective appearance. It
   implements `ksni::Tray`. `Tray::new()` spawns it with the blocking API, which runs the D-Bus
   service on its own thread. `Tray::apply(&TrayView, dark)` calls `handle.update(…)` only when
   something changed. iced reports system appearance changes on Linux even with no window open,
@@ -166,8 +168,7 @@ up by position.
   menu with a hidden trailing entry, and the bar reloads it through `LayoutUpdated`.
 - **Clicks.** `MENU_ON_ACTIVATE = true`: a left click opens the menu, as on macOS.
 - **Icon.** SNI has no template images, so `menubar-icon.svg` is rendered as ARGB32 pixmaps at
-  22 px and 44 px in a solid foreground colour: light when the effective appearance is dark, dark
-  when it is light. The connected and disconnected variants come from the existing
+  22 px and 44 px in a solid foreground colour: light on a dark bar, dark on a light one. The connected and disconnected variants come from the existing
   `menubar_rgba(px, connected)`. The icon is redrawn when the appearance or the connection changes.
 - **Resilience.** The tray is spawned with `assume_sni_available(true)`. If no
   StatusNotifierWatcher exists yet, for example when autostart beats the bar at login, the item
@@ -236,8 +237,9 @@ waits for a new window, and Downlink starts with only a tray icon.
 - The launcher entry passes `--show-layout`, so a start from the launcher opens the Layout window.
   The autostart entry doesn't, so login stays silent.
 - The instance holding the single-instance lock listens on a Unix socket next to the lock
-  (`$XDG_RUNTIME_DIR/downlink.sock`). A second launch sends it `show-layout` and exits; the
-  running instance opens its Layout window as the tray item does. `std` only, so it builds on
+  (`$XDG_RUNTIME_DIR/downlink.sock`). A second launch with `--show-layout` sends it
+  `show-layout` and exits; the running instance opens its Layout window as the tray item does. A
+  second launch without the flag (a login item, a script) exits silently, as in v1. `std` only, so it builds on
   macOS too, where Finder never starts a second copy.
 - Hyprland ignores a focus request from Downlink itself (the launcher passes no activation
   token), so bringing an already-open window forward is left to the desktop: on Omarchy,
