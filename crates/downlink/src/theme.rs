@@ -71,6 +71,16 @@ pub fn is_dark(appearance: Appearance, system: Mode) -> bool {
     }
 }
 
+/// Whether to draw the tray icon for a dark bar. The bar follows the system appearance, not
+/// Downlink's window override; until the system mode is known, the effective one is the guess.
+pub fn tray_is_dark(appearance: Appearance, system: Mode) -> bool {
+    match system {
+        Mode::Dark => true,
+        Mode::Light => false,
+        Mode::None => is_dark(appearance, system),
+    }
+}
+
 pub fn iced_theme(dark_mode: bool) -> Theme {
     let c = colors(dark_mode);
     Theme::custom(

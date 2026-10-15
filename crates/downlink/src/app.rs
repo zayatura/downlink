@@ -413,7 +413,7 @@ impl App {
 
     fn refresh_tray(&mut self) {
         let view = self.engine.tray_view(|id| self.source_name(id));
-        let dark = self.is_dark();
+        let dark = theme::tray_is_dark(self.engine.config().appearance, self.system_mode);
         if let Some(tray) = self.tray.as_mut() {
             tray.apply(&view, dark);
         }
