@@ -1,5 +1,7 @@
 # Manual hardware checklist (spec §11)
 
+## macOS
+
 Run against the bundled app (`packaging/macos/bundle.sh`, then open `target/bundle/Downlink.app`).
 Record pass/fail and the date for each item.
 
@@ -21,3 +23,32 @@ on the 27b34dc bundle). All items passed.
 - [x] A second launch exits immediately ("already running" in the log).
 - [x] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.
 - [x] Logs in `~/Library/Logs/Downlink/` have no ERROR lines during the above.
+
+## Linux (Hyprland on Omarchy)
+
+Run against the installed binary (`packaging/linux/install.sh`, then start Downlink from the
+launcher), with the udev rule installed. Record pass/fail and the date for each item.
+
+Last run: 2026-10-15, installed from `feat/linux-support` (18a216d), Hyprland 0.56.2 on Omarchy.
+All items passed.
+
+- [x] Cold start from the launcher with the keyboard plugged in: connected within 2 s, tray icon
+      in the bar, the Layout window opens, no "Launching Downlink…" notice.
+- [x] Plug the keyboard in after start: connects within 2 s.
+- [x] Unplug and replug: fallback layout on unplug, icon dims, reconnects.
+- [x] Suspend and resume, three cycles: events resume each time without restarting Downlink.
+- [x] All layers show the right legends in the layout window.
+- [x] Layer 0 selects ZD; transient layers keep it; the bar's layout widget agrees.
+- [x] Fallback layout on unplug and on Quit.
+- [x] Pause Input Switching stops switching (its checkmark shows); resuming switches on the next
+      layer change.
+- [x] Appearance "System" follows the Omarchy light/dark theme live (windows and tray icon);
+      Light and Dark force a palette.
+- [x] Launch at login: enable, reboot, Downlink is running and its icon is in the bar.
+- [x] Meta+W in the Layout and Settings windows closes the window only; the icon stays and
+      switching continues.
+- [x] Restart the bar (`omarchy-restart-shell`): the tray icon comes back.
+- [x] Launch again from the launcher: with no window open, the Layout window opens; with a
+      Downlink window open on another workspace, it comes forward. No notice either way.
+- [x] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.
+- [x] Logs in `~/.local/state/downlink/` have no ERROR lines during the above.
