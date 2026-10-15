@@ -2,7 +2,12 @@
 
 A small menu-bar app for the **ZSA Voyager** keyboard:
 
-- **Live layout view.** Shows the layout flashed on your keyboard, follows the active layer and highlights the keys you press.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/layout-dark.png">
+  <img alt="The Downlink layout window: the Sym L layer held on top of the RO layer, with the keys Sym L leaves to RO greyed out and the held key highlighted" src="docs/images/layout-light.png">
+</picture>
+
+- **Live layout view.** Shows the layout flashed on your keyboard, follows the active layer and highlights the keys you press. Keys a layer leaves transparent show, greyed out, what they fall through to.
 - **Per-layer input-source switching.** For example: Main → English, RO layer → Romanian, HU layer → Hungarian. Transient layers (Navigation, Symbols, …) leave the input source alone.
 - **Reconnects by itself** after sleep, wake and replugging.
 - **Follows macOS Light/Dark** automatically.
@@ -26,9 +31,15 @@ cp -R target/bundle/Downlink.app /Applications/
 open /Applications/Downlink.app
 ```
 
-The Downlink key icon appears in the menu bar. Open **Settings…** to choose an input source for each
-layer and the fallback used when the keyboard disconnects or Downlink quits. Turn on **Launch at
-login** there, too.
+The Downlink key icon appears in the menu bar. Its menu shows the connection, the active layer and
+the input source:
+
+<img alt="The Downlink menu open under its menu-bar icon: Voyager connected, the active layer and input source, Show Layout, Settings, Pause Input Switching and Quit" src="docs/images/menu.png" width="345">
+
+Open **Settings…** to choose an input source for each layer and the fallback used when the keyboard
+disconnects or Downlink quits. Turn on **Launch at login** there, too.
+
+<img alt="The Downlink Settings window: an input source for each layer, the fallback, appearance, launch at login and the layout data" src="docs/images/settings.png" width="420">
 
 ⌘W and ⌘Q close Downlink's windows but keep it running in the menu bar. To quit, use **Quit
 Downlink** in the menu-bar menu.
