@@ -11,6 +11,28 @@ pub struct Layout {
     pub layers: Vec<Layer>,
 }
 
+impl Layout {
+    pub fn layer(&self, index: u8) -> Option<&Layer> {
+        self.layers.iter().find(|layer| layer.index == index)
+    }
+
+    /// The key at Oryx `index` on the first of `layers` that doesn't leave it transparent, and
+    /// that layer's index: what the firmware runs when the key is pressed with `layers` on.
+    pub fn resolve_key(
+        &self,
+        layers: impl IntoIterator<Item = u8>,
+        index: usize,
+    ) -> Option<(u8, &Key)> {
+        layers.into_iter().find_map(|layer| {
+            self.layer(layer)?
+                .keys
+                .get(index)
+                .filter(|key| !key.is_transparent())
+                .map(|key| (layer, key))
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Layer {
     pub index: u8,
@@ -29,9 +51,14 @@ pub struct Key {
 }
 
 impl Key {
-    /// Oryx compiles a key whose four action slots are all empty to `KC_TRANSPARENT`.
+    /// Oryx compiles a key whose four action slots are all empty to `KC_TRANSPARENT`; a tap
+    /// that names it explicitly does the same.
     pub fn is_transparent(&self) -> bool {
-        self.tap.is_none()
+        let tap_transparent = self
+            .tap
+            .as_ref()
+            .is_none_or(|action| matches!(action.code.as_str(), "KC_TRANSPARENT" | "KC_TRNS"));
+        tap_transparent
             && self.hold.is_none()
             && self.double_tap.is_none()
             && self.tap_hold.is_none()

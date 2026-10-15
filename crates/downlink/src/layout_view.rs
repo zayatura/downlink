@@ -91,19 +91,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     let legends: Vec<KeyLegend> = layout
         .as_ref()
-        .and_then(|layout| {
-            let titles: Vec<String> = layout.layers.iter().map(|l| l.title.clone()).collect();
-            layout
-                .layers
-                .iter()
-                .find(|l| l.index == shown)
-                .map(|layer| {
-                    layer
-                        .keys
-                        .iter()
-                        .map(|key| labels::key_legend(key, &titles, modifier_style()))
-                        .collect()
-                })
+        .map(|layout| {
+            let below = engine.layers_below(shown);
+            labels::layer_legends(layout, shown, &below, modifier_style())
         })
         .unwrap_or_default();
 
@@ -236,12 +226,17 @@ impl canvas::Program<Message> for Keyboard {
             } else {
                 1.0
             };
+            let inherited = legend.is_some_and(|l| l.inherited);
             let (fill, ink, sub) = if pressed {
                 (c.press, c.on_press, c.on_press)
+            } else if inherited {
+                // Falls through to a layer beneath: greyed out, as in Oryx.
+                let grey = fade(c.sub_text, INHERITED_ALPHA);
+                (c.key, grey, grey)
             } else {
                 (c.key, c.key_text, c.sub_text)
             };
-            let layer_key = kind == LegendKind::Layer;
+            let layer_key = kind == LegendKind::Layer && !inherited;
             let shape =
                 Path::rounded_rectangle(rect.position(), rect.size(), (rect.width * 0.16).into());
             frame.fill(&shape, fade(fill, alpha));
@@ -269,6 +264,9 @@ impl canvas::Program<Message> for Keyboard {
         vec![frame.into_geometry()]
     }
 }
+
+/// How strongly the legend of a key borrowed from a layer beneath shows.
+const INHERITED_ALPHA: f32 = 0.6;
 
 fn fade(color: Color, alpha: f32) -> Color {
     Color {

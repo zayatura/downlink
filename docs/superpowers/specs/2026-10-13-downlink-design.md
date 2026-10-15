@@ -350,8 +350,15 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
   - The tap legend is large. The hold legend is smaller underneath.
   - Modifiers use ⌃ ⌥ ⌘ ⇧ on macOS and words on Linux.
   - Layer keys get the accent border and the target layer's name.
-  - No-op keys (`KC_NO`) are blank and dimmed. Transparent keys (all slots null) are dimmed and
-    show "▽".
+  - No-op keys (`KC_NO`) are blank and dimmed.
+  - Transparent keys (all slots null) show, greyed out, the key of the first active layer
+    beneath that sets it, as Oryx does. A key that no layer sets is blank and dimmed. The
+    keyboard only reports the highest active layer, so `companion-core`'s `LayerStack`
+    rebuilds the rest from the layer reports and the key pressed just before each one: a lower
+    report switches off the layers above it, and a higher one stacks on top unless the key
+    moves there with `TO` (then it is the only layer on). `DF` replaces the default layer. After
+    connecting, the stack is just the default layer, so transparent keys fall through to it
+    until a layer key is used. A `TG` under a held layer goes unseen (no report).
   - **Pressed keys** fill with the press colour from `KEYDOWN` until `KEYUP`. Highlights are
     tied to physical key positions, so a held layer key stays lit after the layer changes. All
     pressed highlights clear on disconnect, so a missed `KEYUP` can't leave a key stuck.
