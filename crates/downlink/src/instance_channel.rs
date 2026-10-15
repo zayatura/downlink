@@ -63,7 +63,10 @@ pub fn listen(path: &Path, on_request: impl Fn(String) + Send + 'static) -> io::
 }
 
 fn read_request(stream: UnixStream) -> io::Result<String> {
-    stream.set_read_timeout(Some(TIMEOUT))?;
+    // macOS refuses the timeout (EINVAL) once the sender has already closed, as a sender that
+    // writes its line and exits usually has; the line is still there to read, and a closed
+    // sender cannot block the read, so carry on without it.
+    let _ = stream.set_read_timeout(Some(TIMEOUT));
     let mut line = String::new();
     BufReader::new(stream).read_line(&mut line)?;
     Ok(line.trim().to_owned())
