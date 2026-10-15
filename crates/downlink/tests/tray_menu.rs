@@ -115,3 +115,21 @@ fn consecutive_updates_change_the_menu_shape_but_not_what_is_shown() {
     assert_eq!(shown(&even), entries);
     assert_eq!(shown(&odd), entries);
 }
+
+#[test]
+fn the_linux_tray_shows_the_items_without_separators() {
+    use downlink::tray::menu_model::sni_entries;
+    let view = view(true, false);
+    let entries = sni_entries(&view, 2);
+    assert!(!entries.contains(&MenuEntry::Separator));
+    let expected: Vec<MenuEntry> = menu_entries(&view)
+        .into_iter()
+        .filter(|e| *e != MenuEntry::Separator)
+        .collect();
+    assert_eq!(entries, expected);
+    assert_eq!(
+        sni_entries(&view, 3).len(),
+        expected.len() + 1,
+        "still reshaped"
+    );
+}

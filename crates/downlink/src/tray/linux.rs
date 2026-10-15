@@ -5,7 +5,7 @@ use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::{CheckmarkItem, StandardItem};
 use ksni::{Icon, MenuItem, OfflineReason, ToolTip};
 
-use super::menu_model::{MenuEntry, dbusmenu_label, menu_entries, reshaped};
+use super::menu_model::{MenuEntry, dbusmenu_label, sni_entries};
 use super::menu_sender;
 use crate::icon;
 
@@ -72,7 +72,7 @@ impl ksni::Tray for DownlinkTray {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        reshaped(menu_entries(&self.state.view), self.generation)
+        sni_entries(&self.state.view, self.generation)
             .into_iter()
             .map(to_ksni)
             .collect()

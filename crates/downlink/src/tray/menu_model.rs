@@ -68,3 +68,13 @@ pub fn reshaped(mut entries: Vec<MenuEntry>, generation: u64) -> Vec<MenuEntry> 
     }
     entries
 }
+
+/// What the Linux tray shows: the menu without separators, which Omarchy's bar draws 1 or 2
+/// pixels thick at a fractional scale, reshaped for every update.
+pub fn sni_entries(view: &TrayView, generation: u64) -> Vec<MenuEntry> {
+    let entries = menu_entries(view)
+        .into_iter()
+        .filter(|entry| *entry != MenuEntry::Separator)
+        .collect();
+    reshaped(entries, generation)
+}
