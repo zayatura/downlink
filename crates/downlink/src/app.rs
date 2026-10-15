@@ -325,11 +325,13 @@ impl App {
             WindowKind::Layout => window::Settings {
                 size: Size::new(980.0, 440.0),
                 min_size: Some(Size::new(640.0, 300.0)),
+                platform_specific: platform::window_platform_specific(),
                 ..window::Settings::default()
             },
             WindowKind::Settings => window::Settings {
                 size: Size::new(560.0, 720.0),
                 min_size: Some(Size::new(480.0, 420.0)),
+                platform_specific: platform::window_platform_specific(),
                 ..window::Settings::default()
             },
         };
