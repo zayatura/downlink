@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use downlink::platform::autostart;
 
@@ -93,4 +93,17 @@ fn an_installed_binary_writes_a_missing_or_different_entry_only() {
     assert!(!autostart::needs_refresh(Some(&same), exe));
     let moved = autostart::desktop_entry(Path::new("/usr/local/bin/downlink"));
     assert!(autostart::needs_refresh(Some(&moved), exe));
+}
+
+#[test]
+fn a_replaced_binary_still_names_its_path() {
+    // Linux reports a running executable that was replaced on disk (a reinstall) with this suffix.
+    assert_eq!(
+        autostart::live_executable(PathBuf::from("/opt/downlink/bin/downlink (deleted)")),
+        Path::new(INSTALLED)
+    );
+    assert_eq!(
+        autostart::live_executable(PathBuf::from(INSTALLED)),
+        Path::new(INSTALLED)
+    );
 }

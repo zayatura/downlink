@@ -19,7 +19,9 @@ fn config_dir() -> Result<PathBuf, String> {
 pub fn set_launch_at_login(enabled: bool) -> Result<(), String> {
     let config = config_dir()?;
     if enabled {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe = std::env::current_exe()
+            .map(autostart::live_executable)
+            .map_err(|e| e.to_string())?;
         autostart::install(&config, &exe)
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -32,7 +34,9 @@ pub fn set_launch_at_login(enabled: bool) -> Result<(), String> {
 /// dev build. Returns whether it was rewritten.
 pub fn refresh_launch_at_login() -> Result<bool, String> {
     let config = config_dir()?;
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = std::env::current_exe()
+        .map(autostart::live_executable)
+        .map_err(|e| e.to_string())?;
     let existing = match fs::read_to_string(autostart::entry_path(&config)) {
         Ok(text) => Some(text),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,

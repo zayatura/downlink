@@ -34,6 +34,18 @@ pub fn exec_arg(executable: &Path) -> String {
     quoted.replace('\\', "\\\\")
 }
 
+/// `current_exe()` as a path that still opens: Linux names an executable that was replaced on disk
+/// while running (a reinstall) `<path> (deleted)`, and the new file sits at `<path>`.
+pub fn live_executable(executable: PathBuf) -> PathBuf {
+    match executable
+        .to_str()
+        .and_then(|s| s.strip_suffix(" (deleted)"))
+    {
+        Some(path) => PathBuf::from(path),
+        None => executable,
+    }
+}
+
 pub fn desktop_entry(executable: &Path) -> String {
     format!(
         "[Desktop Entry]\n\
