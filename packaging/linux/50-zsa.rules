@@ -1,0 +1,3 @@
+# ZSA keyboards: give the logged-in user access to their raw-HID nodes, so Downlink runs without
+# root. The 50- prefix sorts it before 73-seat-late.rules, which applies the uaccess tag.
+KERNEL=="hidraw*", ATTRS{idVendor}=="3297", TAG+="uaccess"

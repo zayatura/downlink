@@ -223,6 +223,24 @@ Hyprland and the launcher match them to that entry and its icon.
   the mode. On Wayland, iced also reports `Mode::None` each time a window opens (winit can't read
   a window's theme there); `App` already ignores `Mode::None`, and must keep doing so.
 
+### 8.5 Starting from the launcher, and starting again
+
+Added during Phase 1, after Omarchy's launcher showed "Launching Downlink…" for up to 15 s: it
+waits for a new window, and Downlink starts with only a tray icon.
+
+- The launcher entry passes `--show-layout`, so a start from the launcher opens the Layout window.
+  The autostart entry doesn't, so login stays silent.
+- The instance holding the single-instance lock listens on a Unix socket next to the lock
+  (`$XDG_RUNTIME_DIR/downlink.sock`). A second launch sends it `show-layout` and exits; the
+  running instance opens its Layout window as the tray item does. `std` only, so it builds on
+  macOS too, where Finder never starts a second copy.
+- Hyprland ignores a focus request from Downlink itself (the launcher passes no activation
+  token), so bringing an already-open window forward is left to the desktop: on Omarchy,
+  `install.sh` writes the launcher entry as
+  `omarchy-launch-or-focus "^downlink\\$" "<exe> --show-layout"`, which focuses an open Downlink
+  window (matched by its class) and otherwise launches. Elsewhere the entry runs the executable
+  directly. Downlink's code has nothing Hyprland-specific for this.
+
 ## 9. Delivery
 
 ### Phase 0 — Feasibility spike (throwaway code, not merged)

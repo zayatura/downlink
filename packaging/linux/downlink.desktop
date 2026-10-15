@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Downlink
+Comment=Live layout and per-layer input switching for the ZSA Voyager
+Exec=__EXEC__
+Icon=downlink
+Categories=Utility;
+StartupNotify=false
