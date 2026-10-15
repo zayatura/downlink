@@ -1,0 +1,205 @@
+{
+"mice": [
+    {
+        "address": "0x55a8fc720130",
+        "name": "elan067b:00-04f3:31f8-mouse",
+        "defaultSpeed": 0.00000,
+        "scrollFactor": -1.00
+    },    {
+        "address": "0x55a8fd3b1580",
+        "name": "elan067b:00-04f3:31f8-touchpad",
+        "defaultSpeed": 0.00000,
+        "scrollFactor": -1.00
+    },    {
+        "address": "0x55a8fd4f1700",
+        "name": "tpps/2-elan-trackpoint",
+        "defaultSpeed": 0.00000,
+        "scrollFactor": -1.00
+    },    {
+        "address": "0x55a8fe0f6450",
+        "name": "zsa-technology-labs-voyager-consumer-control-1",
+        "defaultSpeed": 0.00000,
+        "scrollFactor": -1.00
+    },    {
+        "address": "0x55a8fe275e50",
+        "name": "zsa-technology-labs-voyager-1",
+        "defaultSpeed": 0.00000,
+        "scrollFactor": -1.00
+    }
+],
+"keyboards": [
+    {
+        "address": "0x55a8fd19bed0",
+        "name": "sof-hda-dsp-headphone",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd1615c0",
+        "name": "video-bus",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd3d8460",
+        "name": "intel-hid-events",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd44f360",
+        "name": "power-button",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd498240",
+        "name": "sleep-button",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd4c5020",
+        "name": "at-translated-set-2-keyboard",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fd4f1b60",
+        "name": "thinkpad-extra-buttons",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fe0ef690",
+        "name": "zsa-technology-labs-voyager",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fe2251d0",
+        "name": "zsa-technology-labs-voyager-consumer-control",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fdfbe950",
+        "name": "zsa-technology-labs-voyager-system-control",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fdebc530",
+        "name": "zsa-technology-labs-voyager-keyboard",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro,us",
+        "variant": ",102_qwerty_dot_nodead,std,",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": false
+    },    {
+        "address": "0x55a8fc65b1a0",
+        "name": "hl-virtual-keyboard-fcitx5",
+        "rules": "",
+        "model": "",
+        "layout": "zd,hu,ro",
+        "variant": ",102_qwerty_dot_nodead,std",
+        "options": "omarchy:shift_caps_compose",
+        "active_layout_index": 0,
+        "active_keymap": "ZD (US with HU/RO alt keys)",
+        "capsLock": false,
+        "numLock": true,
+        "main": true
+    }
+],
+"tablets": [
+
+],
+"touch": [
+    {
+        "address": "0x55a8fc74f6e0",
+        "name": "elan901c:00-04f3:4100"
+    }
+],
+"switches": [
+    {
+        "address": "0x55a8fc71b2c0",
+        "name": "Lid Switch"
+    }
+]
+}
+

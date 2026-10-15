@@ -48,11 +48,11 @@ What was observed on the target machine, and what the design relies on:
 | Session | Hyprland 0.56 (Lua config), Wayland, uwsm with `wayland-session-xdg-autostart@hyprland.desktop.target` | XDG autostart files in `~/.config/autostart/` start at login. |
 | Layouts | Seat-wide `kb_layout = "zd,hu,ro"`, `kb_variant = ",102_qwerty_dot_nodead,std"`. `zd` is a custom layout in `~/.config/xkb/symbols/zd`: US with Hungarian and Romanian letters on AltGr. | The Voyager's HU and RO layers already send Right Alt + key, so ZD types every accent without a layout switch. |
 | Layout cycling | `SUPER + Y` runs `keyboard-layout-cycle`, which applies one absolute index to every keyboard holding the seat's layout list, and reads the active one from the furthest-advanced typed keyboard | Downlink follows the same rules (§6), so all three stay in agreement. |
-| fcitx5 | Running, profile has only `keyboard-us`. Its virtual keyboard `hl-virtual-keyboard-fcitx5` is Hyprland's "main" keyboard and carries the seat keymap. | Switches must include the virtual keyboard. Phase 0 checks that typing follows (§9). |
+| fcitx5 | Running, profile has only `keyboard-us`. Its virtual keyboard `hl-virtual-keyboard-fcitx5` is Hyprland's "main" keyboard and carries the seat keymap. After a config reload its `layout` string can stay stale until the next keymap change. | Switches include the virtual keyboard when its list matches (§6.3). When it doesn't, it still follows the physical keyboards through fcitx5 (Phase 0, P2). |
 | Hyprland IPC | `$XDG_RUNTIME_DIR/hypr/<instance>/.socket.sock`. A long-lived shell's `HYPRLAND_INSTANCE_SIGNATURE` can name a dead instance. | Socket discovery falls back to scanning (§6.1). |
 | Tray | quickshell owns `org.kde.StatusNotifierWatcher`; `omarchy.tray` is in the bar | A StatusNotifierItem tray shows up. |
 | Appearance | `org.gnome.desktop.interface color-scheme` is set by Omarchy themes | iced's portal-based detection follows it. |
-| hidraw | `/dev/hidraw*` are `root:root 0600` | A udev rule is needed (§8.3). |
+| hidraw | `/dev/hidraw*` are `root:root 0600` without a rule. Arch's `extra/zsa-udev` package ships `50-oryx.rules` with the same `uaccess` rule as ours, and it was already installed here. | `zsa-udev` or our udev rule is needed (§8.3). |
 
 **The test configuration.** For this port, the seat-wide list becomes `zd,hu,ro,us`. That's four
 entries, the limit of the XKB text format Wayland clients receive. Downlink maps layer 0 → `zd`
@@ -204,8 +204,10 @@ Hyprland and the launcher match them to that entry and its icon.
   `KERNEL=="hidraw*", ATTRS{idVendor}=="3297", TAG+="uaccess"`.
   This grants the logged-in user access to every ZSA board's hidraw nodes, matching the scope of
   ZSA's own rule. The `50-` prefix sorts it ahead of `73-seat-late.rules`, which applies `uaccess`.
-- The README installs it with `sudo install -m644 packaging/linux/50-zsa.rules /etc/udev/rules.d/`,
-  then `sudo udevadm control --reload` and `sudo udevadm trigger`.
+- On Arch, the README recommends `sudo pacman -S zsa-udev`, which provides the same rule.
+  Otherwise it installs ours with
+  `sudo install -m644 packaging/linux/50-zsa.rules /etc/udev/rules.d/`, then
+  `sudo udevadm control --reload` and `sudo udevadm trigger`.
 - `describe_open_error` maps a permission error from hidapi to "No permission to open the keyboard
   (install the udev rule, see README)". The menu shows it, and the existing open backoff retries,
   so Downlink connects as soon as the rule is installed, without a restart.
@@ -218,7 +220,8 @@ Hyprland and the launcher match them to that entry and its icon.
 - Selecting the fallback on Quit and in the exit backstop.
 - Window close: Downlink runs as an iced `daemon`, which keeps running with no windows open.
 - Appearance: `platform::system_mode()` returns `Mode::None`, and iced's portal watcher supplies
-  the mode.
+  the mode. On Wayland, iced also reports `Mode::None` each time a window opens (winit can't read
+  a window's theme there); `App` already ignores `Mode::None`, and must keep doing so.
 
 ## 9. Delivery
 
