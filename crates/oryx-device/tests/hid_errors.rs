@@ -18,3 +18,12 @@ fn other_errors_pass_through_unchanged() {
         "permission denied"
     );
 }
+
+#[test]
+fn a_hidraw_permission_error_points_at_the_udev_rule() {
+    let raw = "hidapi error: Failed to open a device with path '/dev/hidraw3': Permission denied";
+    assert_eq!(
+        describe_open_error(raw),
+        "No permission to open the keyboard (install the udev rule, see README)"
+    );
+}
