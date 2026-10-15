@@ -1,9 +1,11 @@
-//! The OS keyboard input source (macOS: Text Input Sources).
+//! The OS keyboard input source (macOS: Text Input Sources; Linux: Hyprland's XKB layouts).
 
 mod fake;
+#[cfg(target_os = "linux")]
+pub mod hyprland;
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 mod unsupported;
 
 pub use fake::FakeBackend;
@@ -38,7 +40,11 @@ pub fn system_backend() -> Box<dyn InputSourceBackend> {
     {
         Box::new(macos::TisBackend)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        Box::new(hyprland::HyprlandBackend)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         Box::new(unsupported::UnsupportedBackend)
     }

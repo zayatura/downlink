@@ -3,10 +3,12 @@
 use std::collections::BTreeSet;
 
 use companion_core::{Connection, LayoutState};
-use iced::widget::canvas::{Frame, Geometry, Path, Stroke};
-use iced::widget::{button, canvas, column, row, text};
+use iced::advanced::{Layout, Renderer as _, Widget, layout, renderer, widget};
+use iced::widget::canvas::{Frame, Geometry};
+use iced::widget::{button, canvas, column, row, stack, text};
 use iced::{
-    Border, Color, Element, Fill, Point, Rectangle, Renderer, Size, Theme, alignment, mouse,
+    Border, Color, Element, Fill, Length, Point, Rectangle, Renderer, Size, Theme, Vector,
+    alignment, mouse,
 };
 use oryx_layout::geometry::{self, KeyGeom};
 use oryx_layout::labels::{self, KeyLegend, LegendKind, ModifierStyle};
@@ -102,7 +104,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         connected,
         engine.layout_retry_interval().is_some(),
     );
-    let keyboard = canvas(Keyboard {
+    let board = Keyboard {
         legends,
         pressed: if connected {
             engine.pressed().clone()
@@ -112,7 +114,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
         colors,
         dimmed: !connected,
         message,
-    })
+    };
+    let keyboard = stack![
+        Element::new(Keycaps(board.clone())),
+        canvas(board).width(Fill).height(Fill),
+    ]
     .width(Fill)
     .height(Fill);
 
@@ -187,6 +193,7 @@ fn modifier_style() -> ModifierStyle {
     }
 }
 
+#[derive(Clone)]
 struct Keyboard {
     legends: Vec<KeyLegend>,
     pressed: BTreeSet<usize>,
@@ -195,6 +202,31 @@ struct Keyboard {
     message: Option<String>,
 }
 
+impl Keyboard {
+    /// Every key laid out in an area of `size`, with its legend and how it's painted.
+    fn keys(&self, size: Size) -> Vec<(Rectangle, Option<&KeyLegend>, KeyPaint)> {
+        let (width, height) = geometry::board_size(Model::Voyager);
+        key_rects(
+            size,
+            geometry::keys(Model::Voyager),
+            Size::new(width, height),
+        )
+        .into_iter()
+        .enumerate()
+        .map(|(index, rect)| {
+            let legend = self.legends.get(index);
+            let pressed = self.pressed.contains(&index);
+            (
+                rect,
+                legend,
+                key_paint(legend, pressed, self.dimmed, &self.colors),
+            )
+        })
+        .collect()
+    }
+}
+
+/// The legends and the overlay message, drawn over the keycaps (`Keycaps`).
 impl canvas::Program<Message> for Keyboard {
     type State = ();
 
@@ -207,54 +239,16 @@ impl canvas::Program<Message> for Keyboard {
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
-        let (width, height) = geometry::board_size(Model::Voyager);
-        let rects = key_rects(
-            bounds.size(),
-            geometry::keys(Model::Voyager),
-            Size::new(width, height),
-        );
-        let c = &self.colors;
-        for (index, rect) in rects.iter().enumerate() {
-            let legend = self.legends.get(index);
-            let pressed = self.pressed.contains(&index);
-            let kind = legend.map_or(LegendKind::Blank, |l| l.kind);
-            let quiet = matches!(kind, LegendKind::Transparent | LegendKind::Blank) && !pressed;
-            let alpha = if self.dimmed {
-                0.45
-            } else if quiet {
-                0.55
-            } else {
-                1.0
-            };
-            let inherited = legend.is_some_and(|l| l.inherited);
-            let (fill, ink, sub) = if pressed {
-                (c.press, c.on_press, c.on_press)
-            } else if inherited {
-                // Falls through to a layer beneath: greyed out, as in Oryx.
-                let grey = fade(c.sub_text, INHERITED_ALPHA);
-                (c.key, grey, grey)
-            } else {
-                (c.key, c.key_text, c.sub_text)
-            };
-            let layer_key = kind == LegendKind::Layer && !inherited;
-            let shape =
-                Path::rounded_rectangle(rect.position(), rect.size(), (rect.width * 0.16).into());
-            frame.fill(&shape, fade(fill, alpha));
-            frame.stroke(
-                &shape,
-                Stroke::default()
-                    .with_width(if layer_key { 1.5 } else { 1.0 })
-                    .with_color(fade(if layer_key { c.accent } else { c.border }, alpha)),
-            );
+        for (rect, legend, paint) in self.keys(bounds.size()) {
             if let Some(legend) = legend {
-                draw_legend(&mut frame, rect, legend, fade(ink, alpha), fade(sub, alpha));
+                draw_legend(&mut frame, &rect, legend, paint.ink, paint.sub);
             }
         }
         if let Some(message) = &self.message {
             frame.fill_text(canvas::Text {
                 content: message.clone(),
                 position: frame.center(),
-                color: c.sub_text,
+                color: self.colors.sub_text,
                 size: 16.0.into(),
                 align_x: text::Alignment::Center,
                 align_y: alignment::Vertical::Center,
@@ -265,8 +259,126 @@ impl canvas::Program<Message> for Keyboard {
     }
 }
 
+/// The keycaps, drawn as quads like iced's own containers: the quad shader computes how much of
+/// each pixel the rounded rectangle covers. A canvas tessellates outlines into triangles instead,
+/// and their 1-pixel curves break up at fractional display scales such as 1.25×.
+struct Keycaps(Keyboard);
+
+impl Widget<Message, Theme, Renderer> for Keycaps {
+    fn size(&self) -> Size<Length> {
+        Size::new(Fill, Fill)
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut widget::Tree,
+        _renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        layout::atomic(limits, Fill, Fill)
+    }
+
+    fn draw(
+        &self,
+        _tree: &widget::Tree,
+        renderer: &mut Renderer,
+        _theme: &Theme,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+    ) {
+        let area = layout.bounds();
+        let offset = Vector::new(area.x, area.y);
+        for (rect, _, paint) in self.0.keys(area.size()) {
+            let (bounds, radius) =
+                keycap_quad(rect + offset, rect.width * 0.16, paint.border_width);
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds,
+                    border: Border {
+                        color: paint.border,
+                        width: paint.border_width,
+                        radius: radius.into(),
+                    },
+                    ..renderer::Quad::default()
+                },
+                paint.fill,
+            );
+        }
+    }
+}
+
 /// How strongly the legend of a key borrowed from a layer beneath shows.
 const INHERITED_ALPHA: f32 = 0.6;
+
+/// How one key is painted. Fill and border are opaque (faded keys blended over the background);
+/// legend colours keep their fade.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeyPaint {
+    pub fill: Color,
+    pub border: Color,
+    pub border_width: f32,
+    pub ink: Color,
+    pub sub: Color,
+}
+
+pub fn key_paint(legend: Option<&KeyLegend>, pressed: bool, dimmed: bool, c: &Colors) -> KeyPaint {
+    let kind = legend.map_or(LegendKind::Blank, |l| l.kind);
+    let quiet = matches!(kind, LegendKind::Transparent | LegendKind::Blank) && !pressed;
+    let alpha = if dimmed {
+        0.45
+    } else if quiet {
+        0.55
+    } else {
+        1.0
+    };
+    let inherited = legend.is_some_and(|l| l.inherited);
+    let (fill, ink, sub) = if pressed {
+        (c.press, c.on_press, c.on_press)
+    } else if inherited {
+        // Falls through to a layer beneath: greyed out, as in Oryx.
+        let grey = fade(c.sub_text, INHERITED_ALPHA);
+        (c.key, grey, grey)
+    } else {
+        (c.key, c.key_text, c.sub_text)
+    };
+    let (border, border_width) = if kind == LegendKind::Layer && !inherited {
+        (c.accent, 1.5)
+    } else {
+        (c.border, 1.0)
+    };
+    KeyPaint {
+        fill: blend_over(fill, alpha, c.background),
+        border: blend_over(border, alpha, c.background),
+        border_width,
+        ink: fade(ink, alpha),
+        sub: fade(sub, alpha),
+    }
+}
+
+/// `color`, faded by `alpha`, painted over `background`: an opaque colour, which looks the same
+/// whichever surface format the GPU blends in.
+pub fn blend_over(color: Color, alpha: f32, background: Color) -> Color {
+    let a = color.a * alpha;
+    let mix = |fg: f32, bg: f32| fg * a + bg * (1.0 - a);
+    Color::from_rgb(
+        mix(color.r, background.r),
+        mix(color.g, background.g),
+        mix(color.b, background.b),
+    )
+}
+
+/// The quad for a key with a `radius` corner and a `width` border: a quad draws its border inside
+/// its bounds, so it grows by half the width to match a border centred on the key's outline.
+pub fn keycap_quad(key: Rectangle, radius: f32, width: f32) -> (Rectangle, f32) {
+    let half = width / 2.0;
+    let bounds = Rectangle::new(
+        Point::new(key.x - half, key.y - half),
+        Size::new(key.width + width, key.height + width),
+    );
+    (bounds, radius + half)
+}
 
 fn fade(color: Color, alpha: f32) -> Color {
     Color {

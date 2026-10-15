@@ -184,6 +184,8 @@ impl App {
                 // re-seeds the mode too.
                 if mode != Mode::None {
                     self.system_mode = mode;
+                    // The Linux tray icon is drawn for the appearance.
+                    self.refresh_tray();
                 }
                 Task::none()
             }
@@ -323,11 +325,13 @@ impl App {
             WindowKind::Layout => window::Settings {
                 size: Size::new(980.0, 440.0),
                 min_size: Some(Size::new(640.0, 300.0)),
+                platform_specific: platform::window_platform_specific(),
                 ..window::Settings::default()
             },
             WindowKind::Settings => window::Settings {
                 size: Size::new(560.0, 720.0),
                 min_size: Some(Size::new(480.0, 420.0)),
+                platform_specific: platform::window_platform_specific(),
                 ..window::Settings::default()
             },
         };
@@ -409,8 +413,9 @@ impl App {
 
     fn refresh_tray(&mut self) {
         let view = self.engine.tray_view(|id| self.source_name(id));
+        let dark = theme::tray_is_dark(self.engine.config().appearance, self.system_mode);
         if let Some(tray) = self.tray.as_mut() {
-            tray.apply(&view);
+            tray.apply(&view, dark);
         }
     }
 

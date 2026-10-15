@@ -1,4 +1,4 @@
-use downlink::icon::{app_icon_rgba, menubar_rgba};
+use downlink::icon::{app_icon_rgba, menubar_argb, menubar_rgba};
 
 fn px(rgba: &[u8], size: u32, x: u32, y: u32) -> [u8; 4] {
     let i = ((y * size + x) * 4) as usize;
@@ -58,4 +58,26 @@ fn app_icon_is_the_accent_glyph_on_a_dark_square() {
         r < 0x40 && g < 0x40 && b < 0x40,
         "background is dark, got {r},{g},{b}"
     );
+}
+
+#[test]
+fn tray_pixmap_is_argb_in_the_requested_colour() {
+    let rgba = menubar_rgba(22, true);
+    let argb = menubar_argb(22, true, [0xe8, 0xea, 0xee]);
+    assert_eq!(argb.len(), rgba.len());
+    for (a, r) in argb.chunks(4).zip(rgba.chunks(4)) {
+        assert_eq!(a[0], r[3], "alpha comes first, unchanged");
+        assert_eq!(
+            &a[1..],
+            &[0xe8, 0xea, 0xee],
+            "every pixel has the glyph colour"
+        );
+    }
+}
+
+#[test]
+fn disconnected_tray_pixmap_is_dimmed() {
+    let argb = menubar_argb(36, false, [0xff, 0xff, 0xff]);
+    let alpha = argb[((13 * 36 + 18) * 4) as usize];
+    assert!(alpha > 60 && alpha < 120, "dimmed alpha was {alpha}");
 }

@@ -1,5 +1,5 @@
 use companion_core::Appearance;
-use downlink::theme::{self, colors, iced_theme, is_dark};
+use downlink::theme::{self, colors, iced_theme, is_dark, tray_is_dark};
 use iced::Color;
 use iced::theme::Mode;
 
@@ -40,4 +40,15 @@ fn iced_theme_carries_the_palette() {
         theme::dark().background
     );
     assert_eq!(iced_theme(false).palette().primary, theme::light().accent);
+}
+
+#[test]
+fn the_tray_icon_follows_the_system_not_the_window_override() {
+    // The bar is drawn in the system appearance, whatever Downlink's windows use.
+    assert!(!tray_is_dark(Appearance::Dark, Mode::Light));
+    assert!(tray_is_dark(Appearance::Light, Mode::Dark));
+    assert!(tray_is_dark(Appearance::System, Mode::Dark));
+    // Before the system mode is known, the effective appearance is the best guess.
+    assert!(tray_is_dark(Appearance::Dark, Mode::None));
+    assert!(!tray_is_dark(Appearance::System, Mode::None));
 }

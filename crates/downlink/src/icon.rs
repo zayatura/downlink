@@ -18,6 +18,17 @@ pub fn menubar_rgba(size: u32, connected: bool) -> Vec<u8> {
     rgba
 }
 
+/// The menu-bar glyph in one solid colour, as ARGB32 in network byte order: a StatusNotifierItem
+/// pixmap. SNI has no template images, so the caller picks the colour for the appearance.
+pub fn menubar_argb(size: u32, connected: bool, rgb: [u8; 3]) -> Vec<u8> {
+    menubar_rgba(size, connected)
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|pixel| [pixel[3], rgb[0], rgb[1], rgb[2]])
+        .collect()
+}
+
 /// The application icon as straight RGBA.
 pub fn app_icon_rgba(size: u32) -> Vec<u8> {
     render(APP_SVG, size)

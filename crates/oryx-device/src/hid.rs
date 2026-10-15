@@ -82,6 +82,9 @@ impl Transport for HidTransport {
 pub fn describe_open_error(raw: &str) -> String {
     if raw.contains("exclusive access") {
         "The keyboard is in use by another app (quit Keymapp)".to_owned()
+    } else if raw.contains("Permission denied") {
+        // hidraw on Linux, from strerror(EACCES): the udev rule isn't installed (spec §8.3).
+        "No permission to open the keyboard (install the udev rule, see README)".to_owned()
     } else {
         raw.to_owned()
     }

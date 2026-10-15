@@ -84,3 +84,8 @@ pub fn system_mode() -> iced::theme::Mode {
         _ => iced::theme::Mode::Light,
     }
 }
+
+/// Nothing macOS-specific: the bundle identifies the windows.
+pub fn window_platform_specific() -> iced::window::settings::PlatformSpecific {
+    iced::window::settings::PlatformSpecific::default()
+}
