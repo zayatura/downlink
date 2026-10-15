@@ -2,6 +2,7 @@
 
 pub mod app;
 pub mod icon;
+pub mod instance_channel;
 pub mod layout_fetch;
 pub mod logging;
 pub mod paths;
@@ -29,10 +30,19 @@ pub fn run() -> ExitCode {
         return ExitCode::FAILURE;
     };
     let _log_guard = logging::init(&paths.log_dir);
+    let socket = instance_channel::socket_path(&paths.lock_file);
     let _lock = match single_instance::acquire(&paths.lock_file) {
         Ok(Some(lock)) => lock,
         Ok(None) => {
-            tracing::info!("Downlink is already running; exiting");
+            // A launch from the app launcher waits for a window, so the running instance shows one.
+            match instance_channel::send(&socket, instance_channel::SHOW_LAYOUT) {
+                Ok(()) => {
+                    tracing::info!("Downlink is already running; asked it to show the layout")
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "Downlink is already running but didn't answer; exiting")
+                }
+            }
             return ExitCode::SUCCESS;
         }
         Err(error) => {
@@ -41,6 +51,17 @@ pub fn run() -> ExitCode {
         }
     };
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "Downlink starting");
+    let show_layout = |request: String| {
+        if request == instance_channel::SHOW_LAYOUT {
+            let _ = tray::menu_sender().unbounded_send(tray::SHOW_LAYOUT.to_owned());
+        }
+    };
+    if let Err(error) = instance_channel::listen(&socket, show_layout) {
+        tracing::warn!(%error, "a second launch won't be able to show the layout");
+    }
+    if instance_channel::wants_show_layout(std::env::args_os().skip(1)) {
+        let _ = tray::menu_sender().unbounded_send(tray::SHOW_LAYOUT.to_owned());
+    }
     let boot_paths = paths.clone();
     let result = iced::daemon(
         move || App::boot(boot_paths.clone()),
