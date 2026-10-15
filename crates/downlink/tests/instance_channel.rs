@@ -65,3 +65,16 @@ fn only_the_launcher_flag_asks_for_the_layout() {
     assert!(!instance_channel::wants_show_layout(Vec::<&str>::new()));
     assert!(!instance_channel::wants_show_layout(["--other"]));
 }
+
+#[test]
+fn only_a_launcher_start_asks_the_running_instance_for_the_layout() {
+    assert_eq!(
+        instance_channel::second_launch_request(["--show-layout"]),
+        Some(SHOW_LAYOUT)
+    );
+    // A login item or a script starting a second copy stays silent, as before.
+    assert_eq!(
+        instance_channel::second_launch_request(Vec::<&str>::new()),
+        None
+    );
+}

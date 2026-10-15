@@ -35,13 +35,16 @@ pub fn run() -> ExitCode {
         Ok(Some(lock)) => lock,
         Ok(None) => {
             // A launch from the app launcher waits for a window, so the running instance shows one.
-            match instance_channel::send(&socket, instance_channel::SHOW_LAYOUT) {
-                Ok(()) => {
-                    tracing::info!("Downlink is already running; asked it to show the layout")
-                }
-                Err(error) => {
-                    tracing::warn!(%error, "Downlink is already running but didn't answer; exiting")
-                }
+            match instance_channel::second_launch_request(std::env::args_os().skip(1)) {
+                Some(request) => match instance_channel::send(&socket, request) {
+                    Ok(()) => {
+                        tracing::info!("Downlink is already running; asked it to show the layout")
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "Downlink is already running but didn't answer; exiting")
+                    }
+                },
+                None => tracing::info!("Downlink is already running; exiting"),
             }
             return ExitCode::SUCCESS;
         }

@@ -29,6 +29,17 @@ where
     args.into_iter().any(|arg| arg.as_ref() == SHOW_LAYOUT_FLAG)
 }
 
+/// What a second launch asks of the running instance: only a start from the launcher (with the
+/// flag) shows the layout. A second copy started any other way, by a login item for example,
+/// exits silently.
+pub fn second_launch_request<I>(args: I) -> Option<&'static str>
+where
+    I: IntoIterator,
+    I::Item: AsRef<OsStr>,
+{
+    wants_show_layout(args).then_some(SHOW_LAYOUT)
+}
+
 /// Binds the socket and hands each request line to `on_request` from a background thread.
 /// Call it only while holding the single-instance lock: a socket file already at `path` is left
 /// from an instance that has exited, so it is replaced.
