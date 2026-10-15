@@ -78,9 +78,40 @@ fn every_clickable_entry_maps_to_an_action_and_only_quit_quits() {
     for entry in menu_entries(&view(true, false)) {
         let id = match entry {
             MenuEntry::Item { id, .. } | MenuEntry::Check { id, .. } => id,
-            MenuEntry::Label(_) | MenuEntry::Separator => continue,
+            MenuEntry::Label(_) | MenuEntry::Separator | MenuEntry::Hidden => continue,
         };
         let action = menu_action(id).unwrap_or_else(|| panic!("{id} has no action"));
         assert_eq!(action == MenuAction::Quit, id == QUIT, "{id}");
     }
+}
+
+use downlink::tray::menu_model::{dbusmenu_label, reshaped};
+
+#[test]
+fn underscores_in_labels_are_not_mnemonics() {
+    assert_eq!(
+        dbusmenu_label("Layer: Sym_L · Input: us"),
+        "Layer: Sym__L · Input: us"
+    );
+    assert_eq!(dbusmenu_label("Settings…"), "Settings…");
+}
+
+#[test]
+fn consecutive_updates_change_the_menu_shape_but_not_what_is_shown() {
+    let entries = menu_entries(&view(true, true));
+    let even = reshaped(entries.clone(), 4);
+    let odd = reshaped(entries.clone(), 5);
+    assert_ne!(
+        even.len(),
+        odd.len(),
+        "the shape changes, so the host reloads the layout"
+    );
+    let shown = |list: &[MenuEntry]| {
+        list.iter()
+            .filter(|e| **e != MenuEntry::Hidden)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(shown(&even), entries);
+    assert_eq!(shown(&odd), entries);
 }

@@ -18,6 +18,8 @@ pub enum MenuEntry {
         checked: bool,
     },
     Separator,
+    /// An invisible entry; see `reshaped`.
+    Hidden,
 }
 
 /// The same items as the macOS menu (spec §7). The detail row is left out while it's empty.
@@ -48,5 +50,21 @@ pub fn menu_entries(view: &TrayView) -> Vec<MenuEntry> {
             label: "Quit Downlink",
         },
     ]);
+    entries
+}
+
+/// DBusMenu reads `_` as a mnemonic marker; a literal underscore is written twice.
+pub fn dbusmenu_label(text: &str) -> String {
+    text.replace('_', "__")
+}
+
+/// quickshell 0.3, Omarchy's bar, reads an `ItemsPropertiesUpdated` signal as an item's full
+/// property set, so a partial update blanks the label, re-enables a greyed row and drops the
+/// checkmark. ksni sends `LayoutUpdated` instead, which quickshell handles, only when the menu
+/// changes shape: a hidden entry on every other update changes it each time.
+pub fn reshaped(mut entries: Vec<MenuEntry>, generation: u64) -> Vec<MenuEntry> {
+    if generation % 2 == 1 {
+        entries.push(MenuEntry::Hidden);
+    }
     entries
 }

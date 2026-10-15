@@ -29,5 +29,10 @@ objc2-app-kit = { version = "0.3", features = ["NSAppearance", "NSApplication", 
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSString"] }
 tray-icon = "0.26"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# async-io, not the default tokio: ksni's blocking calls would start a tokio runtime inside the
+# one iced runs `update` in, and tokio panics on that (spec §5).
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+
 [dev-dependencies]
 tempfile.workspace = true

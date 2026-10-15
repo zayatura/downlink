@@ -66,10 +66,6 @@ fn menu_channel() -> &'static MenuChannel {
 }
 
 /// Where a tray implementation sends the ID of a clicked item.
-#[cfg_attr(
-    target_os = "linux",
-    expect(dead_code, reason = "the Linux tray doesn't send clicks yet")
-)]
 pub(crate) fn menu_sender() -> &'static mpsc::UnboundedSender<String> {
     &menu_channel().0
 }
