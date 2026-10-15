@@ -402,8 +402,10 @@ Rules 1–3 and 5 match the Python service's behavior. Rule 6 (pause) is new.
 ### 6.5 Theme
 
 - `Appearance = System` follows `system::theme_changes()`. iced reports `Mode::None` until a
-  window exists (Phase 0), so on macOS Downlink seeds the mode itself, from `defaults read -g
-  AppleInterfaceStyle`, at startup and whenever it opens a window. `None` reports from iced
+  window exists (Phase 0). It also stops reporting changes once a window is open, because it
+  pins each window's appearance to the app's theme, and its reports come from those windows. So
+  on macOS Downlink reads `NSApp.effectiveAppearance` itself: at startup, whenever it opens a
+  window, and on the 2-second poll that runs while a window is open. `None` reports from iced
   never overwrite a known mode.
 - `Light` and `Dark` force a palette.
 - Two custom iced `Theme`s (light and dark), with the colours from the mockups
