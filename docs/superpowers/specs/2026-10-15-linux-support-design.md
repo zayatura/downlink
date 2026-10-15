@@ -159,6 +159,11 @@ up by position.
   Each item's `activate` sends its existing menu ID (`show-layout`, `settings`, `pause`, `quit`) into
   the shared menu channel, so `menu_action` and `App::on_menu` are unchanged. There are no
   accelerator hints.
+
+  Changed in Phase 1: the Linux menu leaves the separators out. Omarchy's bar draws each one
+  1 logical pixel thick, which lands on 1 or 2 physical pixels at a 1.25× scale. The bar also
+  reads `ItemsPropertiesUpdated` as an item's full property set, so every update reshapes the
+  menu with a hidden trailing entry, and the bar reloads it through `LayoutUpdated`.
 - **Clicks.** `MENU_ON_ACTIVATE = true`: a left click opens the menu, as on macOS.
 - **Icon.** SNI has no template images, so `menubar-icon.svg` is rendered as ARGB32 pixmaps at
   22 px and 44 px in a solid foreground colour: light when the effective appearance is dark, dark
