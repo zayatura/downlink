@@ -1,0 +1,52 @@
+//! The tray menu as data, built from `TrayView`. The Linux tray turns it into DBusMenu items.
+
+use companion_core::TrayView;
+
+use super::{PAUSE, QUIT, SETTINGS, SHOW_LAYOUT};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuEntry {
+    /// A greyed-out line of text: the status and the detail.
+    Label(String),
+    Item {
+        id: &'static str,
+        label: &'static str,
+    },
+    Check {
+        id: &'static str,
+        label: &'static str,
+        checked: bool,
+    },
+    Separator,
+}
+
+/// The same items as the macOS menu (spec §7). The detail row is left out while it's empty.
+pub fn menu_entries(view: &TrayView) -> Vec<MenuEntry> {
+    let mut entries = vec![MenuEntry::Label(view.status.clone())];
+    if !view.detail.is_empty() {
+        entries.push(MenuEntry::Label(view.detail.clone()));
+    }
+    entries.extend([
+        MenuEntry::Separator,
+        MenuEntry::Item {
+            id: SHOW_LAYOUT,
+            label: "Show Layout",
+        },
+        MenuEntry::Item {
+            id: SETTINGS,
+            label: "Settings…",
+        },
+        MenuEntry::Separator,
+        MenuEntry::Check {
+            id: PAUSE,
+            label: "Pause Input Switching",
+            checked: view.paused,
+        },
+        MenuEntry::Separator,
+        MenuEntry::Item {
+            id: QUIT,
+            label: "Quit Downlink",
+        },
+    ]);
+    entries
+}

@@ -6,6 +6,8 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use futures::channel::mpsc;
 use futures::{SinkExt, Stream, StreamExt};
 
+pub mod menu_model;
+
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
