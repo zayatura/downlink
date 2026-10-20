@@ -1,12 +1,15 @@
 use downlink::tray::{
-    APP_SETTINGS, CLOSE_WINDOW, CLOSE_WINDOW_Q, MenuAction, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT,
+    APP_SETTINGS, CLOSE_ALL_WINDOWS, CLOSE_WINDOW, MenuAction, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT,
     menu_action,
 };
 
 #[test]
-fn cmd_q_and_cmd_w_in_a_window_close_the_window_not_the_app() {
-    assert_eq!(menu_action(CLOSE_WINDOW_Q), Some(MenuAction::CloseWindow));
+fn cmd_w_closes_the_window_and_cmd_q_closes_every_window_not_the_app() {
     assert_eq!(menu_action(CLOSE_WINDOW), Some(MenuAction::CloseWindow));
+    assert_eq!(
+        menu_action(CLOSE_ALL_WINDOWS),
+        Some(MenuAction::CloseAllWindows)
+    );
 }
 
 #[test]
@@ -14,7 +17,7 @@ fn only_the_menu_bar_quit_item_quits() {
     assert_eq!(menu_action(QUIT), Some(MenuAction::Quit));
     for id in [
         CLOSE_WINDOW,
-        CLOSE_WINDOW_Q,
+        CLOSE_ALL_WINDOWS,
         SETTINGS,
         APP_SETTINGS,
         SHOW_LAYOUT,

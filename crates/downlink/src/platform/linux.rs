@@ -8,7 +8,10 @@ use iced::window::settings::PlatformSpecific;
 
 use super::autostart;
 
-pub fn hide_dock_icon() {}
+pub fn show_in_dock(_visible: bool) {}
+
+/// Linux has no AppKit-style termination that skips the event loop's return.
+pub fn on_terminate(_on_exit: impl Fn() + 'static) {}
 
 pub fn activate_app() {}
 

@@ -1,30 +1,57 @@
+use std::ptr::NonNull;
 use std::{fs, io};
 
+use block2::RcBlock;
 use objc2::MainThreadMarker;
 use objc2_app_kit::{
     NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSApplicationActivationPolicy,
+    NSApplicationWillTerminateNotification,
 };
-use objc2_foundation::NSArray;
+use objc2_foundation::{NSArray, NSNotification, NSNotificationCenter};
 
 use super::launch_agent;
 
-/// Menu-bar-only app: no Dock icon, no app menu. Call on the main thread.
-pub fn hide_dock_icon() {
+/// Shows Downlink in the Dock and ⌘Tab while a window is open, and makes it a menu-bar-only app
+/// otherwise. Call on the main thread.
+pub fn show_in_dock(visible: bool) {
     let Some(mtm) = MainThreadMarker::new() else {
-        tracing::warn!("hide_dock_icon must run on the main thread");
+        tracing::warn!("show_in_dock must run on the main thread");
         return;
     };
     let app = NSApplication::sharedApplication(mtm);
+    let policy = if visible {
+        NSApplicationActivationPolicy::Regular
+    } else {
+        NSApplicationActivationPolicy::Accessory
+    };
     // The bundle's LSUIElement already starts Downlink as an accessory app, and macOS answers
     // a request for the policy it already has with "refused".
-    if app.activationPolicy() == NSApplicationActivationPolicy::Accessory {
+    if app.activationPolicy() == policy {
         return;
     }
     #[allow(unused_unsafe)]
-    let changed = unsafe { app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) };
+    let changed = unsafe { app.setActivationPolicy(policy) };
     if !changed {
-        tracing::warn!("macOS refused the accessory activation policy");
+        tracing::warn!(visible, "macOS refused the activation policy change");
     }
+}
+
+/// Runs `on_exit` when AppKit terminates the app, which ends the process without returning from
+/// the event loop: the Dock's Quit, ⌘Tab's Q, and logout.
+pub fn on_terminate(on_exit: impl Fn() + 'static) {
+    let block = RcBlock::new(move |_: NonNull<NSNotification>| on_exit());
+    // SAFETY: no object filter, and a `None` queue runs the block synchronously on the posting
+    // thread, which for this notification is the main thread.
+    let observer = unsafe {
+        NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
+            Some(NSApplicationWillTerminateNotification),
+            None,
+            None,
+            &block,
+        )
+    };
+    // The observer lives as long as the process.
+    std::mem::forget(observer);
 }
 
 /// Brings Downlink's windows to the front (needed for accessory apps).
