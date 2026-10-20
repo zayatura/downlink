@@ -1,6 +1,6 @@
 use downlink::tray::{
-    APP_SETTINGS, CLOSE_ALL_WINDOWS, CLOSE_WINDOW, MenuAction, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT,
-    menu_action,
+    APP_SETTINGS, CLOSE_ALL_WINDOWS, CLOSE_WINDOW, MenuAction, PAUSE, QUIT, REOPEN, SETTINGS,
+    SHOW_LAYOUT, menu_action,
 };
 
 #[test]
@@ -22,6 +22,7 @@ fn only_the_menu_bar_quit_item_quits() {
         APP_SETTINGS,
         SHOW_LAYOUT,
         PAUSE,
+        REOPEN,
     ] {
         assert_ne!(
             menu_action(id),
@@ -37,5 +38,6 @@ fn the_other_items_map_to_their_actions() {
     assert_eq!(menu_action(SETTINGS), Some(MenuAction::ShowSettings));
     assert_eq!(menu_action(APP_SETTINGS), Some(MenuAction::ShowSettings));
     assert_eq!(menu_action(PAUSE), Some(MenuAction::TogglePause));
+    assert_eq!(menu_action(REOPEN), Some(MenuAction::Reopen));
     assert_eq!(menu_action("something-else"), None);
 }

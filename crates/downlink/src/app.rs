@@ -264,6 +264,9 @@ impl App {
     fn init(&mut self) -> Task<Message> {
         tray::install_event_handlers();
         platform::show_in_dock(false);
+        platform::on_reopen(|| {
+            let _ = tray::menu_sender().unbounded_send(tray::REOPEN.to_owned());
+        });
         self.seed_system_mode();
         match AppMenu::install() {
             Ok(menu) => self.app_menu = Some(menu),
@@ -302,6 +305,7 @@ impl App {
             Some(MenuAction::CloseAllWindows) => {
                 Task::batch(self.windows.keys().map(|&id| window::close(id)))
             }
+            Some(MenuAction::Reopen) => self.reopen(),
             None => {
                 tracing::debug!(id, "unknown menu item");
                 Task::none()
@@ -319,6 +323,18 @@ impl App {
             Some(id) => window::close(id),
             None => Task::none(),
         }
+    }
+
+    /// Opening the running app again: bring back the focused (or newest) window, or show the
+    /// layout when none is open.
+    fn reopen(&mut self) -> Task<Message> {
+        let kind = self
+            .focused
+            .and_then(|id| self.windows.get(&id))
+            .or_else(|| self.windows.values().next_back())
+            .copied()
+            .unwrap_or(WindowKind::Layout);
+        self.open_window(kind)
     }
 
     fn open_window(&mut self, kind: WindowKind) -> Task<Message> {

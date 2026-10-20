@@ -2,12 +2,14 @@ use std::ptr::NonNull;
 use std::{fs, io};
 
 use block2::RcBlock;
-use objc2::MainThreadMarker;
+use objc2::rc::Retained;
+use objc2::runtime::{AnyObject, NSObject};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{
     NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSApplicationActivationPolicy,
     NSApplicationWillTerminateNotification,
 };
-use objc2_foundation::{NSArray, NSNotification, NSNotificationCenter};
+use objc2_foundation::{NSAppleEventManager, NSArray, NSNotification, NSNotificationCenter};
 
 use super::launch_agent;
 
@@ -52,6 +54,53 @@ pub fn on_terminate(on_exit: impl Fn() + 'static) {
     };
     // The observer lives as long as the process.
     std::mem::forget(observer);
+}
+
+/// Apple event class and ID of "reopen" (`kCoreEventClass`, `kAEReopenApplication`).
+const CORE_EVENT_CLASS: u32 = u32::from_be_bytes(*b"aevt");
+const REOPEN_APPLICATION: u32 = u32::from_be_bytes(*b"rapp");
+
+define_class!(
+    // SAFETY: NSObject has no subclassing requirements, and `ReopenHandler` doesn't implement
+    // `Drop`.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = Box<dyn Fn()>]
+    struct ReopenHandler;
+
+    impl ReopenHandler {
+        // SAFETY: the signature an Apple event handler selector must have.
+        #[unsafe(method(handleReopen:withReplyEvent:))]
+        fn handle_reopen(&self, _event: *mut AnyObject, _reply: *mut AnyObject) {
+            (self.ivars())();
+        }
+    }
+);
+
+/// Runs `on_reopen` when Finder, Spotlight or the Dock opens Downlink while it runs. macOS sends
+/// the running app a reopen event then, not a second launch. Call on the main thread, after the
+/// event loop has started, as AppKit installs its own handler while launching.
+pub fn on_reopen(on_reopen: impl Fn() + 'static) {
+    let Some(mtm) = MainThreadMarker::new() else {
+        tracing::warn!("on_reopen must run on the main thread");
+        return;
+    };
+    let handler = ReopenHandler::alloc(mtm).set_ivars(Box::new(on_reopen) as Box<dyn Fn()>);
+    // SAFETY: NSObject's `init` on an allocated instance whose ivars are set.
+    let handler: Retained<ReopenHandler> = unsafe { msg_send![super(handler), init] };
+    let manager = NSAppleEventManager::sharedAppleEventManager();
+    // SAFETY: the selector is `handleReopen:withReplyEvent:` above, with the handler signature.
+    // The manager doesn't retain the handler, so it is kept for the life of the process below.
+    unsafe {
+        let _: () = msg_send![
+            &manager,
+            setEventHandler: &*handler,
+            andSelector: sel!(handleReopen:withReplyEvent:),
+            forEventClass: CORE_EVENT_CLASS,
+            andEventID: REOPEN_APPLICATION,
+        ];
+    }
+    std::mem::forget(handler);
 }
 
 /// Brings Downlink's windows to the front (needed for accessory apps).

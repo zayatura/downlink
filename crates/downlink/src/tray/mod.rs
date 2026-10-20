@@ -26,6 +26,9 @@ pub const QUIT: &str = "quit";
 pub const APP_SETTINGS: &str = "app-settings";
 pub const CLOSE_WINDOW: &str = "app-close-window";
 pub const CLOSE_ALL_WINDOWS: &str = "app-close-all-windows";
+/// Not a menu item: macOS asks the running app to reopen when Finder, Spotlight or the Dock
+/// opens it again.
+pub const REOPEN: &str = "reopen";
 
 /// What a clicked menu item (or its shortcut) asks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +39,7 @@ pub enum MenuAction {
     Quit,
     CloseWindow,
     CloseAllWindows,
+    Reopen,
 }
 
 /// Only the menu-bar "Quit Downlink" quits (Phase 0, option B). In a window, ⌘W closes it and ⌘Q
@@ -48,6 +52,7 @@ pub fn menu_action(id: &str) -> Option<MenuAction> {
         QUIT => Some(MenuAction::Quit),
         CLOSE_WINDOW => Some(MenuAction::CloseWindow),
         CLOSE_ALL_WINDOWS => Some(MenuAction::CloseAllWindows),
+        REOPEN => Some(MenuAction::Reopen),
         _ => None,
     }
 }

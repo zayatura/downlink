@@ -343,6 +343,10 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
   `NSApp terminate:`, which ends the process without returning from the event loop; an
   `NSApplicationWillTerminateNotification` observer runs the exit safety net, which selects the
   fallback source.
+- **Opening the running app (2026-10-20).** Finder, Spotlight and the Dock don't start a second
+  copy on macOS; they send the running one a reopen Apple event. Downlink handles it: it brings
+  back the focused (or newest) window, or opens the Layout window when none is open. A first
+  launch stays in the menu bar.
 
 ### 6.2 Layout window (approved: option A, "layer tabs on top")
 

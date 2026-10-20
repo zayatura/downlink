@@ -13,6 +13,9 @@ pub fn show_in_dock(_visible: bool) {}
 /// Linux has no AppKit-style termination that skips the event loop's return.
 pub fn on_terminate(_on_exit: impl Fn() + 'static) {}
 
+/// A second launch reaches the running instance through `instance_channel` instead.
+pub fn on_reopen(_on_reopen: impl Fn() + 'static) {}
+
 pub fn activate_app() {}
 
 fn config_dir() -> Result<PathBuf, String> {
