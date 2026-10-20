@@ -8,13 +8,13 @@ use tray_icon::menu::{
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use super::{
-    APP_SETTINGS, CLOSE_WINDOW, CLOSE_WINDOW_Q, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT, menu_sender,
+    APP_SETTINGS, CLOSE_ALL_WINDOWS, CLOSE_WINDOW, PAUSE, QUIT, SETTINGS, SHOW_LAYOUT, menu_sender,
 };
 use crate::icon;
 
 /// The app's main menu. On macOS it replaces winit's default menu, whose ⌘Q item would call
-/// `NSApp terminate:` and end the process outside Downlink's Quit path. An accessory app never
-/// shows this menu, but macOS still routes its shortcuts while a Downlink window is focused.
+/// `NSApp terminate:` and end the process outside Downlink's Quit path. macOS shows it while a
+/// Downlink window is open, since Downlink is then a regular app.
 pub struct AppMenu {
     _menu: Menu,
 }
@@ -35,8 +35,8 @@ impl AppMenu {
                 accelerator("CmdOrCtrl+W"),
             ),
             &MenuItem::with_id(
-                CLOSE_WINDOW_Q,
-                "Close Window",
+                CLOSE_ALL_WINDOWS,
+                "Close All Windows",
                 true,
                 accelerator("CmdOrCtrl+Q"),
             ),

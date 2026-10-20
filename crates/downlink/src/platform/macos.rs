@@ -1,30 +1,106 @@
+use std::ptr::NonNull;
 use std::{fs, io};
 
-use objc2::MainThreadMarker;
+use block2::RcBlock;
+use objc2::rc::Retained;
+use objc2::runtime::{AnyObject, NSObject};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{
     NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSApplication, NSApplicationActivationPolicy,
+    NSApplicationWillTerminateNotification,
 };
-use objc2_foundation::NSArray;
+use objc2_foundation::{NSAppleEventManager, NSArray, NSNotification, NSNotificationCenter};
 
 use super::launch_agent;
 
-/// Menu-bar-only app: no Dock icon, no app menu. Call on the main thread.
-pub fn hide_dock_icon() {
+/// Shows Downlink in the Dock and ⌘Tab while a window is open, and makes it a menu-bar-only app
+/// otherwise. Call on the main thread.
+pub fn show_in_dock(visible: bool) {
     let Some(mtm) = MainThreadMarker::new() else {
-        tracing::warn!("hide_dock_icon must run on the main thread");
+        tracing::warn!("show_in_dock must run on the main thread");
         return;
     };
     let app = NSApplication::sharedApplication(mtm);
+    let policy = if visible {
+        NSApplicationActivationPolicy::Regular
+    } else {
+        NSApplicationActivationPolicy::Accessory
+    };
     // The bundle's LSUIElement already starts Downlink as an accessory app, and macOS answers
     // a request for the policy it already has with "refused".
-    if app.activationPolicy() == NSApplicationActivationPolicy::Accessory {
+    if app.activationPolicy() == policy {
         return;
     }
     #[allow(unused_unsafe)]
-    let changed = unsafe { app.setActivationPolicy(NSApplicationActivationPolicy::Accessory) };
+    let changed = unsafe { app.setActivationPolicy(policy) };
     if !changed {
-        tracing::warn!("macOS refused the accessory activation policy");
+        tracing::warn!(visible, "macOS refused the activation policy change");
     }
+}
+
+/// Runs `on_exit` when AppKit terminates the app, which ends the process without returning from
+/// the event loop: the Dock's Quit, ⌘Tab's Q, and logout.
+pub fn on_terminate(on_exit: impl Fn() + 'static) {
+    let block = RcBlock::new(move |_: NonNull<NSNotification>| on_exit());
+    // SAFETY: no object filter, and a `None` queue runs the block synchronously on the posting
+    // thread, which for this notification is the main thread.
+    let observer = unsafe {
+        NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
+            Some(NSApplicationWillTerminateNotification),
+            None,
+            None,
+            &block,
+        )
+    };
+    // The observer lives as long as the process.
+    std::mem::forget(observer);
+}
+
+/// Apple event class and ID of "reopen" (`kCoreEventClass`, `kAEReopenApplication`).
+const CORE_EVENT_CLASS: u32 = u32::from_be_bytes(*b"aevt");
+const REOPEN_APPLICATION: u32 = u32::from_be_bytes(*b"rapp");
+
+define_class!(
+    // SAFETY: NSObject has no subclassing requirements, and `ReopenHandler` doesn't implement
+    // `Drop`.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = Box<dyn Fn()>]
+    struct ReopenHandler;
+
+    impl ReopenHandler {
+        // SAFETY: the signature an Apple event handler selector must have.
+        #[unsafe(method(handleReopen:withReplyEvent:))]
+        fn handle_reopen(&self, _event: *mut AnyObject, _reply: *mut AnyObject) {
+            (self.ivars())();
+        }
+    }
+);
+
+/// Runs `on_reopen` when Finder, Spotlight or the Dock opens Downlink while it runs. macOS sends
+/// the running app a reopen event then, not a second launch. Call on the main thread, after the
+/// event loop has started, as AppKit installs its own handler while launching.
+pub fn on_reopen(on_reopen: impl Fn() + 'static) {
+    let Some(mtm) = MainThreadMarker::new() else {
+        tracing::warn!("on_reopen must run on the main thread");
+        return;
+    };
+    let handler = ReopenHandler::alloc(mtm).set_ivars(Box::new(on_reopen) as Box<dyn Fn()>);
+    // SAFETY: NSObject's `init` on an allocated instance whose ivars are set.
+    let handler: Retained<ReopenHandler> = unsafe { msg_send![super(handler), init] };
+    let manager = NSAppleEventManager::sharedAppleEventManager();
+    // SAFETY: the selector is `handleReopen:withReplyEvent:` above, with the handler signature.
+    // The manager doesn't retain the handler, so it is kept for the life of the process below.
+    unsafe {
+        let _: () = msg_send![
+            &manager,
+            setEventHandler: &*handler,
+            andSelector: sel!(handleReopen:withReplyEvent:),
+            forEventClass: CORE_EVENT_CLASS,
+            andEventID: REOPEN_APPLICATION,
+        ];
+    }
+    std::mem::forget(handler);
 }
 
 /// Brings Downlink's windows to the front (needed for accessory apps).

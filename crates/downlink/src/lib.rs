@@ -65,6 +65,12 @@ pub fn run() -> ExitCode {
     if instance_channel::wants_show_layout(std::env::args_os().skip(1)) {
         let _ = tray::menu_sender().unbounded_send(tray::SHOW_LAYOUT.to_owned());
     }
+    let exit_paths = paths.clone();
+    platform::on_terminate(move || {
+        if !app::QUIT_HANDLED.load(Ordering::SeqCst) {
+            select_fallback_on_exit(&exit_paths);
+        }
+    });
     let boot_paths = paths.clone();
     let result = iced::daemon(
         move || App::boot(boot_paths.clone()),
@@ -87,7 +93,8 @@ pub fn run() -> ExitCode {
     }
 }
 
-/// Safety net for event-loop exits that bypass Quit (spec §8), e.g. an event-loop error.
+/// Safety net for exits that bypass Quit (spec §8): an event-loop error, or AppKit terminating
+/// the app.
 fn select_fallback_on_exit(paths: &Paths) {
     let config = load_config_logged(&paths.config_file);
     if let Some(id) = config.fallback {

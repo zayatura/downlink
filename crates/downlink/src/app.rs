@@ -202,6 +202,9 @@ impl App {
                 if self.focused == Some(id) {
                     self.focused = None;
                 }
+                if self.windows.is_empty() {
+                    platform::show_in_dock(false);
+                }
                 Task::none()
             }
             Message::PollSource => {
@@ -260,7 +263,10 @@ impl App {
 
     fn init(&mut self) -> Task<Message> {
         tray::install_event_handlers();
-        platform::hide_dock_icon();
+        platform::show_in_dock(false);
+        platform::on_reopen(|| {
+            let _ = tray::menu_sender().unbounded_send(tray::REOPEN.to_owned());
+        });
         self.seed_system_mode();
         match AppMenu::install() {
             Ok(menu) => self.app_menu = Some(menu),
@@ -296,6 +302,10 @@ impl App {
             }
             Some(MenuAction::Quit) => self.dispatch(Input::Quit),
             Some(MenuAction::CloseWindow) => self.close_focused_window(),
+            Some(MenuAction::CloseAllWindows) => {
+                Task::batch(self.windows.keys().map(|&id| window::close(id)))
+            }
+            Some(MenuAction::Reopen) => self.reopen(),
             None => {
                 tracing::debug!(id, "unknown menu item");
                 Task::none()
@@ -303,7 +313,7 @@ impl App {
         }
     }
 
-    /// ⌘W / ⌘Q in a window: close it and keep running in the menu bar.
+    /// ⌘W in a window: close it and keep running in the menu bar.
     fn close_focused_window(&mut self) -> Task<Message> {
         let target = self
             .focused
@@ -313,6 +323,18 @@ impl App {
             Some(id) => window::close(id),
             None => Task::none(),
         }
+    }
+
+    /// Opening the running app again: bring back the focused (or newest) window, or show the
+    /// layout when none is open.
+    fn reopen(&mut self) -> Task<Message> {
+        let kind = self
+            .focused
+            .and_then(|id| self.windows.get(&id))
+            .or_else(|| self.windows.values().next_back())
+            .copied()
+            .unwrap_or(WindowKind::Layout);
+        self.open_window(kind)
     }
 
     fn open_window(&mut self, kind: WindowKind) -> Task<Message> {
@@ -337,6 +359,8 @@ impl App {
         };
         // Read the appearance now, so the first frame already uses the right palette.
         self.seed_system_mode();
+        // Before the window exists, so it opens in a regular app and ⌘Tab can reach it.
+        platform::show_in_dock(true);
         let (id, open) = window::open(settings);
         self.windows.insert(id, kind);
         open.map(Message::WindowOpened)

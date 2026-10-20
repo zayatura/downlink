@@ -22,7 +22,11 @@ that a second launch without `--show-layout` exits silently and opens no window.
 - [x] Pause Input Switching stops switching; resuming switches on the next layer change.
 - [x] Appearance "System" follows macOS Light/Dark live; Light and Dark force a palette.
 - [x] Launch at login: enable, log out and back in (or reboot), Downlink is running.
-- [x] ⌘W and ⌘Q in the Layout and Settings windows close the window only; the icon stays and switching continues.
+- [x] ⌘W in the Layout and Settings windows closes the window only; the icon stays and switching continues.
+- [ ] ⌘Q in a window closes every Downlink window; the icon stays and switching continues.
+- [ ] Opening a window adds Downlink to the Dock and ⌘Tab; closing the last one removes it.
+- [ ] Quit from the Dock icon's menu ends Downlink and selects the fallback source.
+- [ ] Opening Downlink from Finder or Spotlight while it runs shows the Layout window; again with a window open, it brings that window forward.
 - [x] Minimize the layout window (⌘M), then choose Show Layout from the menu bar: the window comes back and takes focus.
 - [x] A second launch exits immediately ("already running" in the log).
 - [x] Offline (Wi-Fi off) with a cached layout: the layout still shows, switching works.

@@ -333,10 +333,20 @@ Switching never needs a window: the subscriptions run whenever the daemon runs.
   7. **Pause Input Switching** (checkmark when on; not saved, resets on launch)
   8. —
   9. **Quit Downlink** (⌘Q)
-- **In Downlink's windows, ⌘W and ⌘Q close the focused window only.** Downlink keeps running in
-  the menu bar; quitting happens only through the menu's **Quit Downlink**. This was decided after
-  Phase 0, so that an accidental ⌘Q never silently stops input-source switching. A muda app menu
-  replaces winit's default one, which would otherwise call `NSApp terminate:`.
+- **In Downlink's windows, ⌘W closes the focused window and ⌘Q closes every window.** Downlink
+  keeps running in the menu bar; quitting happens only through the menu's **Quit Downlink**. This
+  was decided after Phase 0, so that an accidental ⌘Q never silently stops input-source switching.
+  A muda app menu replaces winit's default one, which would otherwise call `NSApp terminate:`.
+- **Dock and ⌘Tab while a window is open (2026-10-20).** Downlink becomes a regular app when it
+  opens a window and an accessory app again when the last one closes. `LSUIElement` stays on, so
+  a launch at login shows no Dock icon. The Dock's Quit (and ⌘Tab's Q, and logout) still calls
+  `NSApp terminate:`, which ends the process without returning from the event loop; an
+  `NSApplicationWillTerminateNotification` observer runs the exit safety net, which selects the
+  fallback source.
+- **Opening the running app (2026-10-20).** Finder, Spotlight and the Dock don't start a second
+  copy on macOS; they send the running one a reopen Apple event. Downlink handles it: it brings
+  back the focused (or newest) window, or opens the Layout window when none is open. A first
+  launch stays in the menu bar.
 
 ### 6.2 Layout window (approved: option A, "layer tabs on top")
 
